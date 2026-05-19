@@ -21,19 +21,19 @@
       <span>Checkpoint</span>
     </a>
     <div class="nav-right" id="nav-right">
-      <button class="btn-ghost" id="nav-explore">Explorar</button>
-      <button class="btn-ghost" id="nav-ranking">Ranking</button>
-      <button class="btn-ghost" id="nav-mylist" style="display:none">Mi lista</button>
+      <button class="btn-ghost" id="nav-explore" data-i18n="nav.explore">Explorar</button>
+      <button class="btn-ghost" id="nav-ranking" data-i18n="nav.ranking">Ranking</button>
+      <button class="btn-ghost" id="nav-mylist" style="display:none" data-i18n="nav.mylist">Mi lista</button>
       <div class="user-menu" id="user-menu" style="display:none">
         <button class="btn-user" id="btn-username"></button>
         <div class="user-dropdown" id="user-dropdown">
-          <button id="btn-settings">Notificaciones</button>
-          <button id="btn-premium-menu">⭐ Premium</button>
-          <button id="btn-logout">Cerrar sesión</button>
+          <button id="btn-settings" data-i18n="nav.settings">Notificaciones</button>
+          <button id="btn-premium-menu" data-i18n="nav.premium_menu">⭐ Premium</button>
+          <button id="btn-logout" data-i18n="nav.logout">Cerrar sesión</button>
         </div>
       </div>
-      <button class="btn-ghost" id="btn-login">Iniciar sesión</button>
-      <button class="btn-primary" id="btn-register">Registrarse</button>
+      <button class="btn-ghost" id="btn-login" data-i18n="nav.login">Iniciar sesión</button>
+      <button class="btn-primary" id="btn-register" data-i18n="nav.register">Registrarse</button>
     </div>
     <button class="hamburger" id="hamburger" aria-label="Menú">
       <span></span><span></span><span></span>
@@ -47,20 +47,20 @@
     <section class="hero">
       <div class="hero-bg"></div>
       <div class="hero-content">
-        <h1>Marca tu <span class="gradient-text">checkpoint</span></h1>
-        <p>Registra lo que has jugado, puntúa, escribe tus opiniones y compártelas con otros jugadores.</p>
+        <h1 data-i18n-html="hero.title">Marca tu <span class="gradient-text">checkpoint</span></h1>
+        <p data-i18n="hero.subtitle">Registra lo que has jugado, puntúa, escribe tus opiniones y compártelas con otros jugadores.</p>
         <div class="search-bar">
           <span class="search-icon">⌕</span>
-          <input type="text" id="search-input" placeholder="Buscar un juego..." autocomplete="off" />
+          <input type="text" id="search-input" autocomplete="off" data-i18n-placeholder="hero.search" placeholder="Buscar un juego..." />
         </div>
         <!-- Genre pills (browse mode) -->
         <div class="genre-pills" id="genre-pills">
-          <button class="genre-pill active" data-genre="">Todos</button>
+          <button class="genre-pill active" data-genre="" data-i18n="genre.all">Todos</button>
         </div>
         <!-- Platform filter (search mode) -->
         <div class="platform-filter" id="platform-filter" style="display:none">
-          <span style="color:var(--muted);font-size:0.85rem">Plataforma:</span>
-          <button class="platform-pill active" data-platform="">Todas</button>
+          <span style="color:var(--muted);font-size:0.85rem" data-i18n="platform.label">Plataforma:</span>
+          <button class="platform-pill active" data-platform="" data-i18n="platform.all">Todas</button>
           <button class="platform-pill" data-platform="PC">PC</button>
           <button class="platform-pill" data-platform="Mac">Mac</button>
           <button class="platform-pill" data-platform="linux">Linux</button>
@@ -69,14 +69,14 @@
     </section>
     <section class="games-section">
       <div class="section-header">
-        <h2 id="section-title">Juegos populares</h2>
+        <h2 id="section-title" data-i18n="section.popular">Juegos populares</h2>
         <div class="sort-tabs" id="sort-tabs">
-          <button class="sort-tab active" data-sort="popular">Popularidad</button>
-          <button class="sort-tab" data-sort="community">Valoración comunidad</button>
+          <button class="sort-tab active" data-sort="popular" data-i18n="sort.popular">Popularidad</button>
+          <button class="sort-tab" data-sort="community" data-i18n="sort.community">Valoración comunidad</button>
         </div>
       </div>
       <div class="games-grid" id="games-grid">
-        <div class="loading"><div class="spinner"></div><p>Cargando juegos...</p></div>
+        <div class="loading"><div class="spinner"></div><p data-i18n="loading.games">Cargando...</p></div>
       </div>
       <div class="pagination" id="pagination"></div>
     </section>
@@ -86,10 +86,10 @@
   <div id="view-explore" style="display:none">
     <section class="games-section" style="padding-top:100px">
       <div class="section-header">
-        <h2 id="explore-title">Explorar por género</h2>
+        <h2 id="explore-title" data-i18n="explore.title">Explorar por género</h2>
         <div class="sort-tabs" id="genre-sort-tabs" style="display:none">
-          <button class="sort-tab active" data-sort="popular">Popularidad</button>
-          <button class="sort-tab" data-sort="community">Mejor valorados</button>
+          <button class="sort-tab active" data-sort="popular" data-i18n="sort.popular">Popularidad</button>
+          <button class="sort-tab" data-sort="community" data-i18n="sort.toprated">Mejor valorados</button>
         </div>
       </div>
       <div id="explore-content"></div>
@@ -101,8 +101,8 @@
   <div id="view-ranking" style="display:none">
     <section class="games-section" style="padding-top:100px">
       <div class="section-header">
-        <h2>🏆 Ranking de la comunidad</h2>
-        <span style="color:var(--muted);font-size:0.9rem">Top juegos mejor valorados por usuarios</span>
+        <h2 data-i18n="ranking.title">🏆 Ranking de la comunidad</h2>
+        <span style="color:var(--muted);font-size:0.9rem" data-i18n="ranking.subtitle">Top juegos mejor valorados por usuarios</span>
       </div>
       <div id="ranking-list"></div>
     </section>
@@ -113,12 +113,12 @@
     <section class="games-section" style="padding-top:100px">
       <div id="profile-header"></div>
       <div class="section-header" style="margin-top:32px">
-        <h2>Juegos</h2>
+        <h2 data-i18n="profile.games">Juegos</h2>
         <div class="list-tabs" id="profile-tabs">
-          <button class="list-tab active" data-status="all">Todos</button>
-          <button class="list-tab" data-status="played">Jugados</button>
-          <button class="list-tab" data-status="playing">Jugando</button>
-          <button class="list-tab" data-status="wishlist">Deseados</button>
+          <button class="list-tab active" data-status="all" data-i18n="tab.all">Todos</button>
+          <button class="list-tab" data-status="played" data-i18n="tab.played">Jugados</button>
+          <button class="list-tab" data-status="playing" data-i18n="tab.playing">Jugando</button>
+          <button class="list-tab" data-status="wishlist" data-i18n="tab.wishlist">Deseados</button>
         </div>
       </div>
       <div class="games-grid" id="profile-grid"></div>
@@ -129,26 +129,26 @@
   <div id="view-mylist" style="display:none">
     <section class="games-section" style="padding-top:100px">
       <div class="section-header">
-        <h2>Mi lista de juegos</h2>
+        <h2 data-i18n="mylist.title">Mi lista de juegos</h2>
         <div class="list-tabs" id="mylist-tabs">
-          <button class="list-tab active" data-status="all">Todos</button>
-          <button class="list-tab" data-status="played">Jugados</button>
-          <button class="list-tab" data-status="playing">Jugando</button>
-          <button class="list-tab" data-status="wishlist">Deseados</button>
-          <button class="list-tab" data-status="siguiendo">Siguiendo</button>
+          <button class="list-tab active" data-status="all" data-i18n="tab.all">Todos</button>
+          <button class="list-tab" data-status="played" data-i18n="tab.played">Jugados</button>
+          <button class="list-tab" data-status="playing" data-i18n="tab.playing">Jugando</button>
+          <button class="list-tab" data-status="wishlist" data-i18n="tab.wishlist">Deseados</button>
+          <button class="list-tab" data-status="siguiendo" data-i18n="tab.following">Siguiendo</button>
         </div>
       </div>
       <div class="games-grid" id="mylist-grid"></div>
       <div id="following-section" style="display:none">
         <div class="user-search-box">
-          <input type="text" id="user-search-input" class="field-input" placeholder="Buscar jugadores por nombre..." autocomplete="off" />
+          <input type="text" id="user-search-input" class="field-input" data-i18n-placeholder="following.search" placeholder="Buscar jugadores por nombre..." autocomplete="off" />
           <div id="user-search-results"></div>
         </div>
         <div id="following-list"></div>
         <div id="following-feed"></div>
       </div>
       <div class="alerts-section" id="alerts-section">
-        <h3 style="margin:32px 0 16px;font-size:1.1rem">Alertas de precio</h3>
+        <h3 style="margin:32px 0 16px;font-size:1.1rem" data-i18n="alerts.title">Alertas de precio</h3>
         <div id="alerts-list"></div>
       </div>
     </section>
@@ -171,47 +171,47 @@
     <button class="modal-close" id="auth-close">✕</button>
     <div style="padding:32px 28px">
       <div class="auth-tabs">
-        <button class="auth-tab active" id="tab-login" data-tab="login">Iniciar sesión</button>
-        <button class="auth-tab" id="tab-register" data-tab="register">Registrarse</button>
+        <button class="auth-tab active" id="tab-login" data-tab="login" data-i18n="auth.login_tab">Iniciar sesión</button>
+        <button class="auth-tab" id="tab-register" data-tab="register" data-i18n="auth.register_tab">Registrarse</button>
       </div>
       <div id="auth-error" class="auth-error" style="display:none"></div>
 
       <form id="form-login">
-        <label class="field-label">Email</label>
-        <input class="field-input" type="email" id="login-email" required placeholder="tu@email.com" maxlength="254" />
-        <label class="field-label">Contraseña</label>
-        <input class="field-input" type="password" id="login-password" required placeholder="••••••" maxlength="128" />
+        <label class="field-label" data-i18n="auth.email">Email</label>
+        <input class="field-input" type="email" id="login-email" required maxlength="254" data-i18n-placeholder="auth.email_placeholder" placeholder="tu@email.com" />
+        <label class="field-label" data-i18n="auth.password">Contraseña</label>
+        <input class="field-input" type="password" id="login-password" required maxlength="128" data-i18n-placeholder="auth.password_placeholder" placeholder="••••••" />
         <div style="text-align:right;margin:-8px 0 16px">
-          <button type="button" class="link-btn" id="btn-forgot-password">¿Olvidaste tu contraseña?</button>
+          <button type="button" class="link-btn" id="btn-forgot-password" data-i18n="auth.forgot_link">¿Olvidaste tu contraseña?</button>
         </div>
-        <button class="btn-primary w-full" type="submit">Entrar</button>
+        <button class="btn-primary w-full" type="submit" data-i18n="auth.btn_login">Entrar</button>
       </form>
 
       <form id="form-forgot" style="display:none">
-        <p style="color:var(--muted);font-size:0.9rem;margin-bottom:16px">Introduce tu email y te enviaremos un enlace para restablecer tu contraseña.</p>
-        <label class="field-label">Email</label>
-        <input class="field-input" type="email" id="forgot-email" required placeholder="tu@email.com" maxlength="254" />
-        <button class="btn-primary w-full" type="submit">Enviar enlace</button>
-        <button type="button" class="link-btn" id="btn-back-to-login" style="display:block;margin-top:12px;text-align:center">← Volver al inicio de sesión</button>
+        <p style="color:var(--muted);font-size:0.9rem;margin-bottom:16px" data-i18n="forgot.desc">Introduce tu email y te enviaremos un enlace para restablecer tu contraseña.</p>
+        <label class="field-label" data-i18n="auth.email">Email</label>
+        <input class="field-input" type="email" id="forgot-email" required maxlength="254" data-i18n-placeholder="auth.email_placeholder" placeholder="tu@email.com" />
+        <button class="btn-primary w-full" type="submit" data-i18n="forgot.btn">Enviar enlace</button>
+        <button type="button" class="link-btn" id="btn-back-to-login" style="display:block;margin-top:12px;text-align:center" data-i18n="forgot.back">← Volver al inicio de sesión</button>
       </form>
 
       <form id="form-reset" style="display:none">
-        <p style="color:var(--muted);font-size:0.9rem;margin-bottom:16px">Introduce tu nueva contraseña.</p>
-        <label class="field-label">Nueva contraseña</label>
-        <input class="field-input" type="password" id="reset-password" required placeholder="Mínimo 6 caracteres" minlength="6" maxlength="128" />
-        <label class="field-label">Confirmar contraseña</label>
-        <input class="field-input" type="password" id="reset-password2" required placeholder="Repite la contraseña" minlength="6" maxlength="128" />
-        <button class="btn-primary w-full" type="submit">Cambiar contraseña</button>
+        <p style="color:var(--muted);font-size:0.9rem;margin-bottom:16px" data-i18n="reset.desc">Introduce tu nueva contraseña.</p>
+        <label class="field-label" data-i18n="reset.new_password">Nueva contraseña</label>
+        <input class="field-input" type="password" id="reset-password" required minlength="6" maxlength="128" data-i18n-placeholder="auth.password_min" placeholder="Mínimo 6 caracteres" />
+        <label class="field-label" data-i18n="reset.confirm">Confirmar contraseña</label>
+        <input class="field-input" type="password" id="reset-password2" required minlength="6" maxlength="128" data-i18n-placeholder="auth.repeat_placeholder" placeholder="Repite la contraseña" />
+        <button class="btn-primary w-full" type="submit" data-i18n="reset.btn">Cambiar contraseña</button>
       </form>
 
       <form id="form-register" style="display:none">
-        <label class="field-label">Nombre de usuario</label>
-        <input class="field-input" type="text" id="reg-username" required placeholder="gamer123" minlength="3" maxlength="30" />
-        <label class="field-label">Email</label>
-        <input class="field-input" type="email" id="reg-email" required placeholder="tu@email.com" maxlength="254" />
-        <label class="field-label">Contraseña</label>
-        <input class="field-input" type="password" id="reg-password" required placeholder="Mínimo 6 caracteres" minlength="6" maxlength="128" />
-        <button class="btn-primary w-full" type="submit">Crear cuenta</button>
+        <label class="field-label" data-i18n="auth.username">Nombre de usuario</label>
+        <input class="field-input" type="text" id="reg-username" required minlength="3" maxlength="30" data-i18n-placeholder="auth.username_placeholder" placeholder="gamer123" />
+        <label class="field-label" data-i18n="auth.email">Email</label>
+        <input class="field-input" type="email" id="reg-email" required maxlength="254" data-i18n-placeholder="auth.email_placeholder" placeholder="tu@email.com" />
+        <label class="field-label" data-i18n="auth.password">Contraseña</label>
+        <input class="field-input" type="password" id="reg-password" required minlength="6" maxlength="128" data-i18n-placeholder="auth.password_min" placeholder="Mínimo 6 caracteres" />
+        <button class="btn-primary w-full" type="submit" data-i18n="auth.btn_register">Crear cuenta</button>
       </form>
     </div>
   </div>
@@ -223,19 +223,19 @@
     <button class="modal-close" id="premium-close">✕</button>
     <div style="padding:32px 28px;text-align:center">
       <div style="font-size:2.5rem;margin-bottom:12px">⭐</div>
-      <h3 style="font-size:1.4rem;font-weight:800;margin-bottom:8px">Checkpoint Premium</h3>
-      <p style="color:var(--muted);margin-bottom:24px;font-size:0.95rem">Apoya el proyecto y desbloquea todas las funciones</p>
+      <h3 style="font-size:1.4rem;font-weight:800;margin-bottom:8px" data-i18n="premium.title">Checkpoint Premium</h3>
+      <p style="color:var(--muted);margin-bottom:24px;font-size:0.95rem" data-i18n="premium.subtitle">Apoya el proyecto y desbloquea todas las funciones</p>
       <div class="premium-features">
-        <div class="premium-feature">✓ Alertas de precio <strong>ilimitadas</strong></div>
-        <div class="premium-feature">✓ Insignia <strong>⭐ Premium</strong> en tu perfil</div>
-        <div class="premium-feature">✓ Apoyas el desarrollo de la app</div>
+        <div class="premium-feature" data-i18n-html="premium.feature1">✓ Alertas de precio <strong>ilimitadas</strong></div>
+        <div class="premium-feature" data-i18n-html="premium.feature2">✓ Insignia <strong>⭐ Premium</strong> en tu perfil</div>
+        <div class="premium-feature" data-i18n="premium.feature3">✓ Apoyas el desarrollo de la app</div>
       </div>
       <div style="margin:24px 0 8px">
-        <span style="font-size:2rem;font-weight:800">3,99€</span>
-        <span style="color:var(--muted)">/mes</span>
+        <span style="font-size:2rem;font-weight:800" data-i18n="premium.price">3,99€</span>
+        <span style="color:var(--muted)" data-i18n="premium.period">/mes</span>
       </div>
-      <button class="btn-primary w-full" id="btn-go-premium" style="font-size:1rem;padding:14px">Hazte Premium</button>
-      <p style="color:var(--muted);font-size:0.75rem;margin-top:12px">Cancela cuando quieras · Pago seguro con Stripe</p>
+      <button class="btn-primary w-full" id="btn-go-premium" style="font-size:1rem;padding:14px" data-i18n="premium.btn">Hazte Premium</button>
+      <p style="color:var(--muted);font-size:0.75rem;margin-top:12px" data-i18n="premium.note">Cancela cuando quieras · Pago seguro con Stripe</p>
     </div>
   </div>
 </div>
@@ -245,17 +245,17 @@
   <div class="modal modal-sm" id="settings-modal">
     <button class="modal-close" id="settings-close">✕</button>
     <div style="padding:32px 28px">
-      <h3 style="margin-bottom:20px;font-size:1.2rem;font-weight:700">Ajustes</h3>
+      <h3 style="margin-bottom:20px;font-size:1.2rem;font-weight:700" data-i18n="settings.title">Ajustes</h3>
 
-      <label class="field-label">Steam ID o nombre de usuario de Steam</label>
-      <input class="field-input" type="text" id="steam-id-input" placeholder="ej: sergiogg o 76561198xxxxxxxxx" />
-      <p style="color:var(--muted);font-size:0.8rem;margin:-8px 0 16px">Tu perfil de Steam debe ser público. Puedes usar tu nombre de usuario o tu SteamID64.</p>
-      <button class="btn-ghost w-full" id="btn-steam-preview" style="margin-bottom:20px">🎮 Conectar Steam e importar juegos</button>
+      <label class="field-label" data-i18n="settings.steam_label">Steam ID o nombre de usuario de Steam</label>
+      <input class="field-input" type="text" id="steam-id-input" data-i18n-placeholder="settings.steam_placeholder" placeholder="ej: sergiogg o 76561198xxxxxxxxx" />
+      <p style="color:var(--muted);font-size:0.8rem;margin:-8px 0 16px" data-i18n="settings.steam_hint">Tu perfil de Steam debe ser público. Puedes usar tu nombre de usuario o tu SteamID64.</p>
+      <button class="btn-ghost w-full" id="btn-steam-preview" style="margin-bottom:20px" data-i18n="settings.steam_btn">🎮 Conectar Steam e importar juegos</button>
 
-      <label class="field-label">Topic de ntfy.sh (para alertas de precio)</label>
-      <input class="field-input" type="text" id="ntfy-topic" placeholder="mi-topic-secreto" />
-      <p style="color:var(--muted);font-size:0.8rem;margin:-8px 0 16px">Recibirás una notificación push en ntfy.sh cuando baje el precio. Deja vacío para desactivar.</p>
-      <button class="btn-primary w-full" id="btn-save-settings">Guardar ajustes</button>
+      <label class="field-label" data-i18n="settings.ntfy_label">Topic de ntfy.sh (para alertas de precio)</label>
+      <input class="field-input" type="text" id="ntfy-topic" data-i18n-placeholder="settings.ntfy_placeholder" placeholder="mi-topic-secreto" />
+      <p style="color:var(--muted);font-size:0.8rem;margin:-8px 0 16px" data-i18n="settings.ntfy_hint">Recibirás una notificación push en ntfy.sh cuando baje el precio. Deja vacío para desactivar.</p>
+      <button class="btn-primary w-full" id="btn-save-settings" data-i18n="settings.btn_save">Guardar ajustes</button>
     </div>
   </div>
 </div>
@@ -271,6 +271,7 @@
   </div>
 </div>
 
+<script src="/js/i18n.js"></script>
 <script src="/js/auth.js"></script>
 <script src="/js/app.js"></script>
 </body>

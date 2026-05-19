@@ -140,24 +140,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('form-login').addEventListener('submit', async e => {
     e.preventDefault();
-    const btn = e.target.querySelector('button');
-    btn.disabled = true; btn.textContent = 'Entrando...';
+    const btn = e.target.querySelector('button[type="submit"]');
+    btn.disabled = true; btn.textContent = t('auth.btn_logging_in');
     try {
       await AUTH.doLogin(
         document.getElementById('login-email').value,
         document.getElementById('login-password').value
       );
     } catch (err) {
-      AUTH.showError(err.message);
+      AUTH.showError(translateError(err.message));
     } finally {
-      btn.disabled = false; btn.textContent = 'Entrar';
+      btn.disabled = false; btn.textContent = t('auth.btn_login');
     }
   });
 
   document.getElementById('form-register').addEventListener('submit', async e => {
     e.preventDefault();
-    const btn = e.target.querySelector('button');
-    btn.disabled = true; btn.textContent = 'Creando cuenta...';
+    const btn = e.target.querySelector('button[type="submit"]');
+    btn.disabled = true; btn.textContent = t('auth.btn_registering');
     try {
       await AUTH.doRegister(
         document.getElementById('reg-username').value,
@@ -165,9 +165,9 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('reg-password').value
       );
     } catch (err) {
-      AUTH.showError(err.message);
+      AUTH.showError(translateError(err.message));
     } finally {
-      btn.disabled = false; btn.textContent = 'Crear cuenta';
+      btn.disabled = false; btn.textContent = t('auth.btn_register');
     }
   });
 
@@ -223,18 +223,18 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('form-forgot').addEventListener('submit', async e => {
     e.preventDefault();
     const btn = e.target.querySelector('button[type="submit"]');
-    btn.disabled = true; btn.textContent = 'Enviando...';
+    btn.disabled = true; btn.textContent = t('forgot.btn_sending');
     try {
       await AUTH.apiFetch('/api/auth/forgot-password', {
         method: 'POST',
         body: JSON.stringify({ email: document.getElementById('forgot-email').value })
       });
-      AUTH.showSuccess('Si el email existe, recibirás un enlace en breve. Revisa tu bandeja de entrada.');
+      AUTH.showSuccess(t('forgot.success'));
       e.target.reset();
     } catch (err) {
-      AUTH.showError(err.message);
+      AUTH.showError(translateError(err.message));
     } finally {
-      btn.disabled = false; btn.textContent = 'Enviar enlace';
+      btn.disabled = false; btn.textContent = t('forgot.btn');
     }
   });
 
@@ -242,9 +242,9 @@ document.addEventListener('DOMContentLoaded', () => {
     e.preventDefault();
     const pw = document.getElementById('reset-password').value;
     const pw2 = document.getElementById('reset-password2').value;
-    if (pw !== pw2) { AUTH.showError('Las contraseñas no coinciden'); return; }
+    if (pw !== pw2) { AUTH.showError(t('reset.no_match')); return; }
     const btn = e.target.querySelector('button[type="submit"]');
-    btn.disabled = true; btn.textContent = 'Guardando...';
+    btn.disabled = true; btn.textContent = t('reset.btn_saving');
     try {
       const token = new URLSearchParams(location.search).get('token');
       await AUTH.apiFetch('/api/auth/reset-password', {
@@ -252,19 +252,19 @@ document.addEventListener('DOMContentLoaded', () => {
         body: JSON.stringify({ token, password: pw })
       });
       history.replaceState({}, '', '/');
-      AUTH.showSuccess('¡Contraseña cambiada! Ya puedes iniciar sesión.');
+      AUTH.showSuccess(t('reset.success'));
       setTimeout(() => AUTH.switchTab('login'), 1800);
     } catch (err) {
-      AUTH.showError(err.message);
+      AUTH.showError(translateError(err.message));
     } finally {
-      btn.disabled = false; btn.textContent = 'Cambiar contraseña';
+      btn.disabled = false; btn.textContent = t('reset.btn');
     }
   });
 
   // Steam import button
   document.getElementById('btn-steam-preview').addEventListener('click', () => {
     const steamId = document.getElementById('steam-id-input').value.trim();
-    if (!steamId) { alert('Introduce tu Steam ID primero'); return; }
+    if (!steamId) { alert(t('steam.no_id')); return; }
     document.getElementById('settings-overlay').classList.remove('open');
     openSteamImport(steamId);
   });

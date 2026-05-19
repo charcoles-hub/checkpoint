@@ -52,7 +52,7 @@ document.getElementById('nav-explore').addEventListener('click', () => { history
 function resetHome() {
   currentPage = 1; currentSearch = ''; currentGenre = ''; currentPlatform = ''; currentSort = 'popular';
   searchInput.value = '';
-  sectionTitle.textContent = 'Juegos populares';
+  sectionTitle.textContent = t('section.popular');
   document.querySelectorAll('.genre-pill').forEach(p => p.classList.toggle('active', p.dataset.genre === ''));
   document.querySelectorAll('.platform-pill').forEach(p => p.classList.toggle('active', p.dataset.platform === ''));
   document.getElementById('platform-filter').style.display = 'none';
@@ -102,7 +102,7 @@ async function initGenrePills() {
 
 function renderGenrePills(genres) {
   const container = document.getElementById('genre-pills');
-  container.innerHTML = '<button class="genre-pill active" data-genre="">Todos</button>';
+  container.innerHTML = `<button class="genre-pill active" data-genre="">${t('genre.all')}</button>`;
   genres.forEach(g => {
     const btn = document.createElement('button');
     btn.className = 'genre-pill';
@@ -119,8 +119,8 @@ function renderGenrePills(genres) {
       currentSort = 'popular';
       document.querySelectorAll('#sort-tabs .sort-tab').forEach(t => t.classList.toggle('active', t.dataset.sort === 'popular'));
       sectionTitle.textContent = currentGenre
-        ? `Mejores de ${genres.find(g => g.key === currentGenre)?.name || currentGenre}`
-        : 'Juegos populares';
+        ? t('section.genre_best', {name: genres.find(g => g.key === currentGenre)?.name || currentGenre})
+        : t('section.popular');
       loadGames();
     });
   });
@@ -159,7 +159,7 @@ document.querySelectorAll('#sort-tabs .sort-tab').forEach(tab => {
 // ── Game cards ───────────────────────────────────────
 function renderCard(game, onClick) {
   const platforms = (game.platforms || []).slice(0, 3);
-  const statusLabel = { played: 'Jugado', playing: 'Jugando', wishlist: 'Deseado' };
+  const statusLabel = { played: t('status.played'), playing: t('status.playing'), wishlist: t('status.wishlist') };
   const name = game.name || game.game_name;
   const image = game.image || game.game_image;
 
@@ -187,7 +187,7 @@ function renderCard(game, onClick) {
 
 // ── Load games (home) ─────────────────────────────────
 async function loadGames() {
-  grid.innerHTML = '<div class="loading"><div class="spinner"></div><p>Cargando...</p></div>';
+  grid.innerHTML = `<div class="loading"><div class="spinner"></div><p>${t('loading.games')}</p></div>`;
   paginationEl.innerHTML = '';
 
   try {
@@ -209,7 +209,7 @@ async function loadGames() {
     }
 
     if (!data.results?.length) {
-      grid.innerHTML = '<div class="no-results">No se encontraron juegos.</div>';
+      grid.innerHTML = `<div class="no-results">${t('no_games')}</div>`;
       return;
     }
     grid.innerHTML = '';
@@ -220,7 +220,7 @@ async function loadGames() {
     if (currentPlatform) applyPlatformFilter();
     renderPagination();
   } catch {
-    grid.innerHTML = '<div class="no-results">Error al cargar juegos.</div>';
+    grid.innerHTML = `<div class="no-results">${t('error.games')}</div>`;
   }
 }
 
@@ -245,8 +245,8 @@ searchInput.addEventListener('input', e => {
     currentPlatform = '';
     document.querySelectorAll('.platform-pill').forEach(p => p.classList.toggle('active', p.dataset.platform === ''));
     sectionTitle.textContent = q
-      ? `Resultados para "${q}"`
-      : (currentGenre ? `Mejores de ${currentGenre}` : 'Juegos populares');
+      ? t('section.results', {q})
+      : (currentGenre ? t('section.genre_best', {name: currentGenre}) : t('section.popular'));
     loadGames();
   }, 400);
 });
@@ -262,12 +262,12 @@ function renderPagination(containerEl = paginationEl, onPage) {
   if (totalPages > 1) pages.push(totalPages);
   containerEl.innerHTML = '';
   const go = onPage || ((p) => { currentPage = p; loadGames(); scrollTo(0, 400); });
-  containerEl.appendChild(mkBtn('← Anterior', currentPage === 1, () => { currentPage--; go(currentPage); }));
+  containerEl.appendChild(mkBtn(t('btn.prev'), currentPage === 1, () => { currentPage--; go(currentPage); }));
   pages.forEach(p => {
     if (p === '…') { const s = document.createElement('span'); s.style.cssText = 'padding:8px 4px;color:var(--muted)'; s.textContent = '…'; containerEl.appendChild(s); }
     else containerEl.appendChild(mkBtn(p, false, () => go(p), p === currentPage));
   });
-  containerEl.appendChild(mkBtn('Siguiente →', currentPage === totalPages, () => { currentPage++; go(currentPage); }));
+  containerEl.appendChild(mkBtn(t('btn.next'), currentPage === totalPages, () => { currentPage++; go(currentPage); }));
 }
 
 function mkBtn(label, disabled, onClick, active = false) {
@@ -283,7 +283,7 @@ async function loadExplore() {
   const title = document.getElementById('explore-title');
   const content = document.getElementById('explore-content');
   const sortTabs = document.getElementById('genre-sort-tabs');
-  title.textContent = 'Explorar por género';
+  title.textContent = t('explore.title');
   sortTabs.style.display = 'none';
   content.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
 
@@ -312,7 +312,7 @@ async function loadExplore() {
         <div class="genre-card-body">
           <span class="genre-emoji">${genre.emoji}</span>
           <span class="genre-card-name">${genre.name}</span>
-          ${count ? `<span class="genre-card-count">${count.toLocaleString()} juegos</span>` : ''}
+          ${count ? `<span class="genre-card-count">${t('explore.games', {n: count.toLocaleString()})}</span>` : ''}
         </div>
       `;
       card.addEventListener('click', () => {
@@ -324,7 +324,7 @@ async function loadExplore() {
 
     content.appendChild(genreGrid);
   } catch {
-    content.innerHTML = '<div class="no-results">Error al cargar géneros.</div>';
+    content.innerHTML = `<div class="no-results">${t('explore.error')}</div>`;
   }
 }
 
@@ -345,7 +345,7 @@ async function loadGenreDetail(genreKey) {
   title.textContent = `${genre?.emoji || ''} ${genre?.name || genreKey}`;
 
   // Back button
-  content.innerHTML = `<button class="btn-ghost" id="btn-back-explore" style="margin-bottom:20px">← Volver a géneros</button><div class="games-grid" id="genre-grid"><div class="loading"><div class="spinner"></div></div></div>`;
+  content.innerHTML = `<button class="btn-ghost" id="btn-back-explore" style="margin-bottom:20px">${t('explore.back')}</button><div class="games-grid" id="genre-grid"><div class="loading"><div class="spinner"></div></div></div>`;
   document.getElementById('btn-back-explore').addEventListener('click', () => {
     history.pushState({}, '', '/explore');
     sortTabs.style.display = 'none';
@@ -363,7 +363,7 @@ async function loadGenreDetail(genreKey) {
     if (genreSort === 'community') {
       sorted = sorted.filter(g => g.avg_rating).sort((a, b) => b.avg_rating - a.avg_rating);
       if (!sorted.length) {
-        genreGrid.innerHTML = '<div class="no-results">Aún no hay valoraciones de la comunidad para este género. ¡Sé el primero!</div>';
+        genreGrid.innerHTML = `<div class="no-results">${t('explore.no_community')}</div>`;
         return;
       }
     }
@@ -437,7 +437,7 @@ async function openModal(gameId) {
     ]);
     const genres = (g.genres || []).map(x => `<span class="genre-tag">${x}</span>`).join('');
     const plats = (g.platforms || []).slice(0, 5).map(p => `<span class="platform-tag">${p}</span>`).join('');
-    const desc = (g.description || 'Sin descripción.').slice(0, 500) + (g.description?.length > 500 ? '…' : '');
+    const desc = (g.description || t('modal.no_desc')).slice(0, 500) + (g.description?.length > 500 ? '…' : '');
 
     modalContent.innerHTML = `
       ${g.image ? `<div class="detail-hero"><img class="detail-hero-img" src="${g.image}" alt="${g.name}" /><div class="detail-hero-gradient"></div></div>` : ''}
@@ -454,7 +454,7 @@ async function openModal(gameId) {
       ${steamAch?.total > 0 ? `
       <div class="achievements-section">
         <div class="achievements-header">
-          <span>🏆 Logros</span>
+          <span>${t('modal.achievements')}</span>
           <span class="ach-count">${steamAch.achieved}/${steamAch.total}</span>
         </div>
         <div class="ach-bar"><div class="ach-progress" style="width:${Math.round(steamAch.achieved/steamAch.total*100)}%"></div></div>
@@ -464,27 +464,27 @@ async function openModal(gameId) {
           </div>`).join('')}</div>` : ''}
       </div>` : ''}
       <div class="detail-actions">
-        <button class="btn-add" id="modal-btn-played">✓ Jugado</button>
-        <button class="btn-add" id="modal-btn-playing" style="background:var(--cyan);color:#000">▶ Jugando</button>
-        <button class="btn-wishlist" id="modal-btn-wishlist">♡ Deseos</button>
+        <button class="btn-add" id="modal-btn-played">${t('modal.btn_played')}</button>
+        <button class="btn-add" id="modal-btn-playing" style="background:var(--cyan);color:#000">${t('modal.btn_playing')}</button>
+        <button class="btn-wishlist" id="modal-btn-wishlist">${t('modal.btn_wishlist')}</button>
       </div>
       <div id="rating-form" style="display:none" class="alert-form-box">
-        <p class="alert-form-label" style="margin-bottom:14px">¿Qué te pareció? <span style="color:var(--muted);font-size:0.8rem">(opcional)</span></p>
+        <p class="alert-form-label" style="margin-bottom:14px">${t('modal.rating_label')} <span style="color:var(--muted);font-size:0.8rem">${t('modal.optional')}</span></p>
         <div id="stars-container" style="margin-bottom:14px;display:flex;gap:2px"></div>
-        <textarea id="review-notes" class="field-input" rows="2" placeholder="Escribe tu opinión..." style="resize:vertical;margin-bottom:12px"></textarea>
+        <textarea id="review-notes" class="field-input" rows="2" placeholder="${t('modal.rating_placeholder')}" style="resize:vertical;margin-bottom:12px"></textarea>
         <div style="display:flex;gap:10px">
-          <button class="btn-add" id="btn-save-rating">Guardar</button>
-          <button class="btn-ghost" id="btn-skip-rating">Sin valorar</button>
+          <button class="btn-add" id="btn-save-rating">${t('modal.btn_save')}</button>
+          <button class="btn-ghost" id="btn-skip-rating">${t('modal.btn_skip')}</button>
         </div>
       </div>
       <div id="alert-form" style="display:none" class="alert-form-box">
-        <p class="alert-form-label">¿A qué precio te avisamos? (actual: <strong>${g.price || 'gratis'}</strong>)</p>
+        <p class="alert-form-label">${t('modal.alert_label', {price: g.price || t('modal.free')})}</p>
         <div class="alert-input-row">
           <span style="color:var(--muted2)">€</span>
           <input type="number" id="alert-price-input" min="0.01" step="0.01"
             placeholder="${g.price_eur ? (g.price_eur * 0.7).toFixed(2) : '10.00'}" class="field-input" style="margin:0;flex:1" />
-          <button class="btn-primary" id="btn-set-alert">Activar alerta</button>
-          <button class="btn-ghost" id="btn-skip-alert">Sin alerta</button>
+          <button class="btn-primary" id="btn-set-alert">${t('modal.btn_set_alert')}</button>
+          <button class="btn-ghost" id="btn-skip-alert">${t('modal.btn_skip_alert')}</button>
         </div>
       </div>
       ${myEntry ? `
@@ -495,15 +495,15 @@ async function openModal(gameId) {
         </div>
         ${myEntry.notes ? `<p class="my-entry-notes">"${escHtml(myEntry.notes)}"</p>` : ''}
         <div class="draft-section">
-          <label style="font-size:0.82rem;color:var(--muted);display:block;margin-bottom:6px">Mis apuntes privados</label>
-          <textarea id="draft-input" class="field-input" rows="3" placeholder="Ideas, impresiones, pendientes..." style="resize:vertical;margin-bottom:8px">${escHtml(myEntry.draft_notes || '')}</textarea>
-          <button class="btn-ghost" id="btn-save-draft" style="padding:6px 14px;font-size:0.85rem">Guardar apuntes</button>
+          <label style="font-size:0.82rem;color:var(--muted);display:block;margin-bottom:6px">${t('modal.draft_label')}</label>
+          <textarea id="draft-input" class="field-input" rows="3" placeholder="${t('modal.draft_placeholder')}" style="resize:vertical;margin-bottom:8px">${escHtml(myEntry.draft_notes || '')}</textarea>
+          <button class="btn-ghost" id="btn-save-draft" style="padding:6px 14px;font-size:0.85rem">${t('modal.btn_draft')}</button>
         </div>
       </div>` : AUTH.user ? `
       <div class="draft-section" style="margin-top:16px">
-        <label style="font-size:0.82rem;color:var(--muted);display:block;margin-bottom:6px">Mis apuntes privados (sin valoración oficial)</label>
-        <textarea id="draft-input" class="field-input" rows="3" placeholder="Ideas, impresiones, pendientes..." style="resize:vertical;margin-bottom:8px"></textarea>
-        <button class="btn-ghost" id="btn-save-draft" style="padding:6px 14px;font-size:0.85rem">Guardar apuntes</button>
+        <label style="font-size:0.82rem;color:var(--muted);display:block;margin-bottom:6px">${t('modal.draft_label_new')}</label>
+        <textarea id="draft-input" class="field-input" rows="3" placeholder="${t('modal.draft_placeholder')}" style="resize:vertical;margin-bottom:8px"></textarea>
+        <button class="btn-ghost" id="btn-save-draft" style="padding:6px 14px;font-size:0.85rem">${t('modal.btn_draft')}</button>
       </div>` : ''}
     `;
 
@@ -517,7 +517,7 @@ async function openModal(gameId) {
     });
     document.getElementById('modal-btn-playing').addEventListener('click', async () => {
       if (!AUTH.user) { AUTH.showModal('login'); return; }
-      await saveEntry(g, 'playing'); showToast('▶ Añadido a "Jugando"');
+      await saveEntry(g, 'playing'); showToast(t('toast.playing'));
     });
     document.getElementById('modal-btn-wishlist').addEventListener('click', async () => {
       if (!AUTH.user) { AUTH.showModal('login'); return; }
@@ -533,32 +533,32 @@ async function openModal(gameId) {
         steam_appid: g.id, game_name: g.name, game_image: g.image, status: 'played', rating, notes
       })});
       document.getElementById('rating-form').style.display = 'none';
-      showToast(rating ? `✓ Guardado con valoración ${rating}/10` : '✓ Añadido a jugados');
+      showToast(rating ? t('toast.saved_rating', {n: rating}) : t('toast.saved'));
     });
     document.getElementById('btn-skip-rating').addEventListener('click', () => {
       document.getElementById('rating-form').style.display = 'none';
-      showToast('✓ Añadido a jugados');
+      showToast(t('toast.saved'));
     });
     document.getElementById('btn-set-alert')?.addEventListener('click', async () => {
       const price = parseFloat(document.getElementById('alert-price-input').value);
-      if (!price || price <= 0) { alert('Introduce un precio válido'); return; }
+      if (!price || price <= 0) { alert(t('toast.invalid_price')); return; }
       try {
         await AUTH.apiFetch('/api/alerts', { method: 'POST', body: JSON.stringify({
           steam_appid: g.id, game_name: g.name, game_image: g.image, target_price: price
         })});
         document.getElementById('alert-form').style.display = 'none';
-        showToast(`🔔 Alerta activada a ${price.toFixed(2)}€`);
+        showToast(t('toast.alert_set', {price: price.toFixed(2)}));
       } catch (e) {
         if (e.status === 403) {
           document.getElementById('alert-form').style.display = 'none';
-          showToast('Límite de alertas gratuitas alcanzado');
+          showToast(t('toast.alert_limit'));
           setTimeout(() => showPremiumModal(), 500);
         }
       }
     });
     document.getElementById('btn-skip-alert')?.addEventListener('click', () => {
       document.getElementById('alert-form').style.display = 'none';
-      showToast('♡ Añadido a lista de deseos');
+      showToast(t('toast.wishlist'));
     });
     document.getElementById('btn-save-draft')?.addEventListener('click', async () => {
       if (!AUTH.user) { AUTH.showModal('login'); return; }
@@ -568,14 +568,14 @@ async function openModal(gameId) {
         steam_appid: g.id, game_name: g.name, game_image: g.image,
         status, rating: myEntry?.rating || null, notes: myEntry?.notes || null, draft_notes: draft
       })});
-      showToast('📝 Apuntes guardados');
+      showToast(t('toast.draft'));
     });
   } catch {
     modalContent.innerHTML = `
       <div class="no-results" style="padding:40px 0">
         <p style="font-size:1.5rem;margin-bottom:8px">😕</p>
-        <p>No se pudo cargar el juego.</p>
-        <button class="btn-ghost" style="margin-top:16px" onclick="closeModal()">Cerrar</button>
+        <p>${t('modal.error')}</p>
+        <button class="btn-ghost" style="margin-top:16px" onclick="closeModal()">${t('modal.close')}</button>
       </div>`;
   }
 }
@@ -602,7 +602,7 @@ async function loadMyList() {
   let listSearch = '';
   const searchBox = document.createElement('div');
   searchBox.className = 'list-search-box';
-  searchBox.innerHTML = `<input type="text" class="field-input" id="list-search" placeholder="Buscar en mi lista..." style="max-width:320px;margin-bottom:16px" />`;
+  searchBox.innerHTML = `<input type="text" class="field-input" id="list-search" placeholder="${t('mylist.search')}" style="max-width:320px;margin-bottom:16px" />`;
   listGrid.parentNode.insertBefore(searchBox, listGrid);
   searchBox.querySelector('#list-search').addEventListener('input', e => {
     listSearch = e.target.value.toLowerCase();
@@ -628,8 +628,8 @@ async function loadMyList() {
     if (!filtered.length) {
       const isEmpty = entries.length === 0;
       listGrid.innerHTML = isEmpty
-        ? `<div class="empty-state"><div class="empty-icon">🎮</div><h3>Tu lista está vacía</h3><p>Busca un juego y añádelo a tu lista para empezar</p><button class="btn-primary" id="btn-start-exploring">Explorar juegos</button></div>`
-        : `<div class="no-results">No hay juegos en esta categoría${listSearch ? ` con "${escHtml(listSearch)}"` : ''}.</div>`;
+        ? `<div class="empty-state"><div class="empty-icon">🎮</div><h3>${t('mylist.empty_title')}</h3><p>${t('mylist.empty_desc')}</p><button class="btn-primary" id="btn-start-exploring">${t('mylist.btn_explore')}</button></div>`
+        : `<div class="no-results">${listSearch ? t('mylist.no_search', {q: escHtml(listSearch)}) : t('mylist.no_category')}</div>`;
       document.getElementById('btn-start-exploring')?.addEventListener('click', () => {
         history.pushState({}, '', '/'); resetHome();
       });
@@ -655,13 +655,13 @@ async function loadMyList() {
   shareDiv.style.cssText = 'margin-top:24px;padding:16px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;gap:12px;flex-wrap:wrap';
   const profileUrl = `${location.origin}/u/${AUTH.user.username}`;
   shareDiv.innerHTML = `
-    <span style="color:var(--muted2);font-size:0.9rem">Tu perfil público:</span>
+    <span style="color:var(--muted2);font-size:0.9rem">${t('mylist.profile_url')}</span>
     <code style="color:var(--cyan);font-size:0.85rem;flex:1">${profileUrl}</code>
-    <button class="btn-ghost" id="btn-copy-profile" style="padding:6px 14px;font-size:0.85rem">Copiar enlace</button>
+    <button class="btn-ghost" id="btn-copy-profile" style="padding:6px 14px;font-size:0.85rem">${t('mylist.btn_copy')}</button>
   `;
   section.appendChild(shareDiv);
   document.getElementById('btn-copy-profile').addEventListener('click', () => {
-    navigator.clipboard.writeText(profileUrl); showToast('🔗 Enlace copiado');
+    navigator.clipboard.writeText(profileUrl); showToast(t('toast.link_copied'));
   });
 }
 
@@ -672,25 +672,25 @@ function renderAlerts(alerts) {
   const limitBar = !isPremium ? `
     <div style="margin-bottom:12px;padding:10px 14px;background:var(--surface2);border-radius:8px;display:flex;align-items:center;justify-content:space-between;gap:12px">
       <div style="flex:1">
-        <div style="font-size:0.82rem;color:var(--muted2);margin-bottom:6px">Alertas usadas: ${active.length}/3</div>
+        <div style="font-size:0.82rem;color:var(--muted2);margin-bottom:6px">${t('alerts.used', {n: active.length})}</div>
         <div style="height:4px;background:var(--border);border-radius:2px">
           <div style="height:4px;background:${active.length >= 3 ? '#ef4444' : 'var(--purple)'};border-radius:2px;width:${Math.min(active.length/3*100,100)}%"></div>
         </div>
       </div>
       ${active.length >= 3 ? `<button class="btn-follow" onclick="showPremiumModal()" style="font-size:0.8rem">⭐ Premium</button>` : ''}
     </div>` : '';
-  if (!alerts.length) { el.innerHTML = limitBar + '<p style="color:var(--muted)">No tienes alertas de precio activas.</p>'; return; }
+  if (!alerts.length) { el.innerHTML = limitBar + `<p style="color:var(--muted)">${t('alerts.empty')}</p>`; return; }
   el.innerHTML = limitBar + alerts.map(a => `
     <div class="alert-row ${a.triggered ? 'alert-triggered' : ''}">
       <img src="${a.game_image || ''}" class="alert-thumb" onerror="this.style.display='none'" />
       <div class="alert-info">
         <div class="alert-game">${a.game_name}</div>
-        <div class="alert-details">Objetivo: <strong>${a.target_price.toFixed(2)}€</strong>
-          ${a.current_price ? ` · Actual: <strong>${a.current_price.toFixed(2)}€</strong>` : ''}
-          ${a.triggered ? ' · <span style="color:var(--cyan)">✓ ¡Precio alcanzado!</span>' : ''}
+        <div class="alert-details">${t('alerts.objective')} <strong>${a.target_price.toFixed(2)}€</strong>
+          ${a.current_price ? ` · ${t('alerts.current')} <strong>${a.current_price.toFixed(2)}€</strong>` : ''}
+          ${a.triggered ? ` · <span style="color:var(--cyan)">${t('alerts.triggered')}</span>` : ''}
         </div>
       </div>
-      <button class="btn-ghost alert-del" data-appid="${a.steam_appid}" style="padding:6px 12px;font-size:0.8rem">Eliminar</button>
+      <button class="btn-ghost alert-del" data-appid="${a.steam_appid}" style="padding:6px 12px;font-size:0.8rem">${t('alerts.btn_delete')}</button>
     </div>
   `).join('');
   el.querySelectorAll('.alert-del').forEach(btn => {
@@ -716,16 +716,16 @@ async function loadFollowingSection() {
 
   // Render followed users
   if (!following.length) {
-    listEl.innerHTML = '<p style="color:var(--muted);margin-bottom:24px">Aún no sigues a nadie. Búscalos arriba.</p>';
+    listEl.innerHTML = `<p style="color:var(--muted);margin-bottom:24px">${t('following.empty')}</p>`;
   } else {
-    listEl.innerHTML = '<h4 style="margin-bottom:12px;color:var(--muted2);font-size:0.9rem;text-transform:uppercase;letter-spacing:.05em">Siguiendo</h4>';
+    listEl.innerHTML = `<h4 style="margin-bottom:12px;color:var(--muted2);font-size:0.9rem;text-transform:uppercase;letter-spacing:.05em">${t('following.title')}</h4>`;
     following.forEach(u => {
       const row = document.createElement('div');
       row.className = 'user-row';
       row.innerHTML = `
         <div class="user-avatar-sm">${u.username[0].toUpperCase()}</div>
         <span class="user-row-name">${u.username}</span>
-        <button class="btn-follow following" data-username="${u.username}">Siguiendo</button>
+        <button class="btn-follow following" data-username="${u.username}">${t('following.btn_following')}</button>
       `;
       row.querySelector('.user-avatar-sm').addEventListener('click', () => {
         history.pushState({}, '', `/u/${u.username}`); showView('profile'); loadProfile(u.username);
@@ -736,7 +736,7 @@ async function loadFollowingSection() {
       row.querySelector('.btn-follow').addEventListener('click', async (e) => {
         await AUTH.apiFetch(`/api/follow/${u.username}`, { method: 'DELETE' });
         row.remove();
-        showToast(`Dejaste de seguir a ${u.username}`);
+        showToast(t('toast.unfollow', {u: u.username}));
         followingLoaded = false;
       });
       listEl.appendChild(row);
@@ -745,10 +745,10 @@ async function loadFollowingSection() {
 
   // Render activity feed
   if (!feed.length) {
-    feedEl.innerHTML = '<p style="color:var(--muted)">La actividad de las personas que sigues aparecerá aquí.</p>';
+    feedEl.innerHTML = `<p style="color:var(--muted)">${t('following.feed_empty')}</p>`;
   } else {
-    feedEl.innerHTML = '<h4 style="margin:24px 0 12px;color:var(--muted2);font-size:0.9rem;text-transform:uppercase;letter-spacing:.05em">Actividad reciente</h4>';
-    const statusLabel = { played: 'Jugado', playing: 'Jugando', wishlist: 'Deseado' };
+    feedEl.innerHTML = `<h4 style="margin:24px 0 12px;color:var(--muted2);font-size:0.9rem;text-transform:uppercase;letter-spacing:.05em">${t('following.activity')}</h4>`;
+    const statusLabel = { played: t('status.played'), playing: t('status.playing'), wishlist: t('status.wishlist') };
     const statusColor = { played: 'var(--purple)', playing: 'var(--cyan)', wishlist: 'var(--muted2)' };
     feed.forEach(e => {
       const item = document.createElement('div');
@@ -788,7 +788,7 @@ async function loadFollowingSection() {
     if (!q) { resultsEl.innerHTML = ''; return; }
     searchTO = setTimeout(async () => {
       const users = await AUTH.apiFetch(`/api/users/search?q=${encodeURIComponent(q)}`);
-      if (!users.length) { resultsEl.innerHTML = '<p style="color:var(--muted);padding:8px 0">Sin resultados.</p>'; return; }
+      if (!users.length) { resultsEl.innerHTML = `<p style="color:var(--muted);padding:8px 0">${t('following.no_results')}</p>`; return; }
       resultsEl.innerHTML = '';
       users.forEach(u => {
         const row = document.createElement('div');
@@ -797,22 +797,22 @@ async function loadFollowingSection() {
           <div class="user-avatar-sm">${u.username[0].toUpperCase()}</div>
           <div style="flex:1">
             <span class="user-row-name">${u.username}</span>
-            <span style="color:var(--muted);font-size:0.8rem;margin-left:8px">${u.total_games} juegos</span>
+            <span style="color:var(--muted);font-size:0.8rem;margin-left:8px">${t('following.games', {n: u.total_games})}</span>
           </div>
           <button class="btn-follow ${u.is_following ? 'following' : ''}" data-username="${u.username}">
-            ${u.is_following ? 'Siguiendo' : 'Seguir'}
+            ${u.is_following ? t('following.btn_following') : t('following.btn_follow')}
           </button>
         `;
         const btn = row.querySelector('.btn-follow');
         btn.addEventListener('click', async () => {
           if (btn.classList.contains('following')) {
             await AUTH.apiFetch(`/api/follow/${u.username}`, { method: 'DELETE' });
-            btn.classList.remove('following'); btn.textContent = 'Seguir';
-            showToast(`Dejaste de seguir a ${u.username}`);
+            btn.classList.remove('following'); btn.textContent = t('following.btn_follow');
+            showToast(t('toast.unfollow', {u: u.username}));
           } else {
             await AUTH.apiFetch(`/api/follow/${u.username}`, { method: 'POST' });
-            btn.classList.add('following'); btn.textContent = 'Siguiendo';
-            showToast(`Siguiendo a ${u.username}`);
+            btn.classList.add('following'); btn.textContent = t('following.btn_following');
+            showToast(t('toast.follow', {u: u.username}));
           }
           followingLoaded = false;
         });
@@ -829,13 +829,13 @@ function timeAgo(dateStr) {
   if (!dateStr) return '';
   const diff = Date.now() - new Date(dateStr).getTime();
   const m = Math.floor(diff / 60000);
-  if (m < 1) return 'ahora';
-  if (m < 60) return `hace ${m}m`;
+  if (m < 1) return t('time.now');
+  if (m < 60) return t('time.minutes', {n: m});
   const h = Math.floor(m / 60);
-  if (h < 24) return `hace ${h}h`;
+  if (h < 24) return t('time.hours', {n: h});
   const d = Math.floor(h / 24);
-  if (d < 30) return `hace ${d}d`;
-  return new Date(dateStr).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+  if (d < 30) return t('time.days', {n: d});
+  return new Date(dateStr).toLocaleDateString(t('time.locale'), { day: 'numeric', month: 'short' });
 }
 
 // ── Ranking ──────────────────────────────────────────
@@ -844,7 +844,7 @@ async function loadRanking() {
   el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
   try {
     const games = await AUTH.apiFetch('/api/ranking');
-    if (!games.length) { el.innerHTML = '<div class="no-results">Aún no hay valoraciones. ¡Sé el primero!</div>'; return; }
+    if (!games.length) { el.innerHTML = `<div class="no-results">${t('ranking.empty')}</div>`; return; }
     el.innerHTML = '';
     games.forEach((g, i) => {
       const row = document.createElement('div');
@@ -854,14 +854,14 @@ async function loadRanking() {
         <img src="${g.game_image || ''}" class="alert-thumb" style="width:80px;height:45px" onerror="this.style.display='none'" />
         <div class="alert-info">
           <div class="alert-game">${g.game_name}</div>
-          <div class="alert-details">${g.votes} ${g.votes === 1 ? 'valoración' : 'valoraciones'}</div>
+          <div class="alert-details">${g.votes} ${g.votes === 1 ? t('ranking.vote') : t('ranking.votes_word')}</div>
         </div>
         <div class="ranking-score"><span class="score-num">${g.avg_rating}</span><span class="score-label">/10</span></div>
       `;
       row.addEventListener('click', () => openModal(g.steam_appid));
       el.appendChild(row);
     });
-  } catch { el.innerHTML = '<div class="no-results">Error al cargar el ranking.</div>'; }
+  } catch { el.innerHTML = `<div class="no-results">${t('ranking.error')}</div>`; }
 }
 
 // ── Public Profile ────────────────────────────────────
@@ -871,7 +871,7 @@ async function loadProfile(username) {
   header.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
   try {
     const { user, entries, stats, is_following, is_own } = await AUTH.apiFetch(`/api/users/${username}`);
-    const joined = new Date(user.created_at).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+    const joined = new Date(user.created_at).toLocaleDateString(t('time.locale'), { month: 'long', year: 'numeric' });
     header.innerHTML = `
       <div class="profile-hero">
         <div class="profile-avatar">${user.username[0].toUpperCase()}</div>
@@ -879,24 +879,24 @@ async function loadProfile(username) {
           <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
             <h2 class="profile-name">${user.username}${user.is_premium ? ' <span class="premium-badge">⭐</span>' : ''}</h2>
             ${!is_own && AUTH.user ? `<button class="btn-follow ${is_following ? 'following' : ''}" id="btn-follow-profile">
-              ${is_following ? 'Siguiendo' : 'Seguir'}
+              ${is_following ? t('profile.btn_following') : t('profile.btn_follow')}
             </button>` : ''}
           </div>
-          <p style="color:var(--muted);font-size:0.9rem;margin-top:4px">Miembro desde ${joined}</p>
+          <p style="color:var(--muted);font-size:0.9rem;margin-top:4px">${t('profile.member_since', {date: joined})}</p>
           <div style="display:flex;gap:16px;margin-top:8px">
-            <span style="color:var(--muted2);font-size:0.85rem"><strong>${user.followers}</strong> seguidores</span>
-            <span style="color:var(--muted2);font-size:0.85rem"><strong>${user.following}</strong> siguiendo</span>
+            <span style="color:var(--muted2);font-size:0.85rem"><strong>${user.followers}</strong> ${t('profile.followers')}</span>
+            <span style="color:var(--muted2);font-size:0.85rem"><strong>${user.following}</strong> ${t('profile.following_count')}</span>
           </div>
         </div>
       </div>
       <div class="profile-stats">
-        <div class="stat-box"><div class="stat-num">${stats.played}</div><div class="stat-label">Jugados</div></div>
-        <div class="stat-box"><div class="stat-num">${stats.playing}</div><div class="stat-label">Jugando</div></div>
-        <div class="stat-box"><div class="stat-num">${stats.wishlist}</div><div class="stat-label">Deseados</div></div>
-        ${stats.avg_rating ? `<div class="stat-box"><div class="stat-num">${stats.avg_rating}</div><div class="stat-label">Nota media</div></div>` : ''}
-        ${stats.total_playtime > 0 ? `<div class="stat-box"><div class="stat-num">${Math.round(stats.total_playtime/60)}h</div><div class="stat-label">En Steam</div></div>` : ''}
+        <div class="stat-box"><div class="stat-num">${stats.played}</div><div class="stat-label">${t('profile.stat.played')}</div></div>
+        <div class="stat-box"><div class="stat-num">${stats.playing}</div><div class="stat-label">${t('profile.stat.playing')}</div></div>
+        <div class="stat-box"><div class="stat-num">${stats.wishlist}</div><div class="stat-label">${t('profile.stat.wishlist')}</div></div>
+        ${stats.avg_rating ? `<div class="stat-box"><div class="stat-num">${stats.avg_rating}</div><div class="stat-label">${t('profile.stat.avg')}</div></div>` : ''}
+        ${stats.total_playtime > 0 ? `<div class="stat-box"><div class="stat-num">${Math.round(stats.total_playtime/60)}h</div><div class="stat-label">${t('profile.stat.steam')}</div></div>` : ''}
       </div>
-      ${stats.best_game ? `<div class="profile-best"><span style="color:var(--muted);font-size:0.85rem">Mejor valorado:</span> <strong>${escHtml(stats.best_game)}</strong> <span class="game-rating" style="font-size:0.8rem">${stats.best_rating}/10</span></div>` : ''}
+      ${stats.best_game ? `<div class="profile-best"><span style="color:var(--muted);font-size:0.85rem">${t('profile.best_rated')}</span> <strong>${escHtml(stats.best_game)}</strong> <span class="game-rating" style="font-size:0.8rem">${stats.best_rating}/10</span></div>` : ''}
     `;
 
     const followBtn = document.getElementById('btn-follow-profile');
@@ -904,12 +904,12 @@ async function loadProfile(username) {
       followBtn.addEventListener('click', async () => {
         if (followBtn.classList.contains('following')) {
           await AUTH.apiFetch(`/api/follow/${username}`, { method: 'DELETE' });
-          followBtn.classList.remove('following'); followBtn.textContent = 'Seguir';
-          showToast(`Dejaste de seguir a ${username}`);
+          followBtn.classList.remove('following'); followBtn.textContent = t('profile.btn_follow');
+          showToast(t('toast.unfollow', {u: username}));
         } else {
           await AUTH.apiFetch(`/api/follow/${username}`, { method: 'POST' });
-          followBtn.classList.add('following'); followBtn.textContent = 'Siguiendo';
-          showToast(`Siguiendo a ${username}`);
+          followBtn.classList.add('following'); followBtn.textContent = t('profile.btn_following');
+          showToast(t('toast.follow', {u: username}));
         }
         followingLoaded = false;
       });
@@ -919,7 +919,7 @@ async function loadProfile(username) {
     function renderProfileList() {
       const filtered = activeStatus === 'all' ? entries : entries.filter(e => e.status === activeStatus);
       profileGrid.innerHTML = '';
-      if (!filtered.length) { profileGrid.innerHTML = '<div class="no-results">Sin juegos.</div>'; return; }
+      if (!filtered.length) { profileGrid.innerHTML = `<div class="no-results">${t('profile.no_games')}</div>`; return; }
       filtered.forEach(e => profileGrid.appendChild(renderCard(e, () => openModal(e.steam_appid))));
     }
     document.querySelectorAll('#profile-tabs .list-tab').forEach(tab => {
@@ -931,7 +931,7 @@ async function loadProfile(username) {
       });
     });
     renderProfileList();
-  } catch { header.innerHTML = '<div class="no-results">Usuario no encontrado.</div>'; }
+  } catch { header.innerHTML = `<div class="no-results">${t('profile.not_found')}</div>`; }
 }
 
 // ── Steam import ──────────────────────────────────────
@@ -942,7 +942,7 @@ steamOverlay.addEventListener('click', e => { if (e.target === steamOverlay) ste
 async function openSteamImport(steamId) {
   const content = document.getElementById('steam-content');
   steamOverlay.classList.add('open');
-  content.innerHTML = '<div class="loading"><div class="spinner"></div><p style="margin-top:12px;color:var(--muted)">Conectando con Steam...</p></div>';
+  content.innerHTML = `<div class="loading"><div class="spinner"></div><p style="margin-top:12px;color:var(--muted)">${t('loading.steam')}</p></div>`;
 
   try {
     const preview = await AUTH.apiFetch(`/api/steam/preview?steam_id=${encodeURIComponent(steamId)}`);
@@ -950,9 +950,9 @@ async function openSteamImport(steamId) {
     const topGames = preview.games.slice(0, 5);
 
     content.innerHTML = `
-      <p style="color:var(--muted);margin-bottom:16px;font-size:0.9rem">Encontrados <strong style="color:var(--text)">${preview.total} juegos</strong> en tu biblioteca</p>
+      <p style="color:var(--muted);margin-bottom:16px;font-size:0.9rem">${t('steam.found', {n: preview.total})}</p>
       <div style="margin-bottom:16px;background:var(--surface2);border-radius:10px;padding:12px;font-size:0.85rem">
-        <div style="color:var(--muted2);margin-bottom:8px">Top juegos por horas:</div>
+        <div style="color:var(--muted2);margin-bottom:8px">${t('steam.top_hours')}</div>
         ${topGames.map(g => `
           <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)">
             <span>${escHtml(g.name)}</span>
@@ -962,40 +962,40 @@ async function openSteamImport(steamId) {
       <div style="margin-bottom:16px">
         <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:10px">
           <input type="radio" name="import-mode" value="played" checked />
-          <span>Solo jugados (${played} juegos con tiempo de juego)</span>
+          <span>${t('steam.mode_played', {n: played})}</span>
         </label>
         <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
           <input type="radio" name="import-mode" value="all" />
-          <span>Toda la biblioteca (${preview.total} juegos)</span>
+          <span>${t('steam.mode_all', {n: preview.total})}</span>
         </label>
       </div>
-      <button class="btn-primary w-full" id="btn-confirm-import">Importar juegos</button>
-      <p style="color:var(--muted);font-size:0.75rem;margin-top:10px;text-align:center">Los juegos ya en tu lista no se sobreescriben (solo se actualiza el tiempo de juego)</p>
+      <button class="btn-primary w-full" id="btn-confirm-import">${t('steam.btn_import')}</button>
+      <p style="color:var(--muted);font-size:0.75rem;margin-top:10px;text-align:center">${t('steam.note')}</p>
     `;
 
     document.getElementById('btn-confirm-import').addEventListener('click', async () => {
       const onlyPlayed = document.querySelector('input[name="import-mode"]:checked').value === 'played';
       const btn = document.getElementById('btn-confirm-import');
-      btn.disabled = true; btn.textContent = 'Importando...';
+      btn.disabled = true; btn.textContent = t('steam.btn_importing');
       try {
         const result = await AUTH.apiFetch('/api/steam/import', {
           method: 'POST',
           body: JSON.stringify({ steam_id: preview.steam_id, games: preview.games, only_played: onlyPlayed })
         });
         steamOverlay.classList.remove('open');
-        showToast(`🎮 ${result.imported} juegos importados desde Steam`);
+        showToast(t('toast.steam_imported', {n: result.imported}));
         followingLoaded = false;
         if (document.getElementById('view-mylist').style.display !== 'none') loadMyList();
       } catch (e) {
-        showToast('Error al importar: ' + e.message);
-        btn.disabled = false; btn.textContent = 'Importar juegos';
+        showToast(translateError(e.message));
+        btn.disabled = false; btn.textContent = t('steam.btn_import');
       }
     });
   } catch(e) {
     content.innerHTML = `
       <div style="text-align:center;padding:20px 0">
-        <p style="color:#ef4444;margin-bottom:12px">${escHtml(e.message)}</p>
-        <p style="color:var(--muted);font-size:0.85rem">Asegúrate de que tu perfil de Steam es público:<br>Steam → Perfil → Editar → Privacidad → Público</p>
+        <p style="color:#ef4444;margin-bottom:12px">${escHtml(translateError(e.message))}</p>
+        <p style="color:var(--muted);font-size:0.85rem">${t('steam.error_public')}</p>
       </div>`;
   }
 }
@@ -1015,7 +1015,7 @@ document.getElementById('btn-premium-menu').addEventListener('click', () => {
     // Open billing portal to manage subscription
     AUTH.apiFetch('/api/billing/portal', { method: 'POST' })
       .then(r => { window.location.href = r.url; })
-      .catch(() => showToast('Error al abrir el portal'));
+      .catch(() => showToast(t('toast.portal_error')));
   } else {
     showPremiumModal();
   }
@@ -1024,13 +1024,13 @@ document.getElementById('btn-premium-menu').addEventListener('click', () => {
 document.getElementById('btn-go-premium').addEventListener('click', async () => {
   if (!AUTH.user) { closePremiumModal(); AUTH.showModal('login'); return; }
   const btn = document.getElementById('btn-go-premium');
-  btn.textContent = 'Redirigiendo...'; btn.disabled = true;
+  btn.textContent = t('premium.redirecting'); btn.disabled = true;
   try {
     const { url } = await AUTH.apiFetch('/api/billing/checkout', { method: 'POST' });
     window.location.href = url;
   } catch (e) {
-    showToast('Error: ' + (e.message || 'Inténtalo de nuevo'));
-    btn.textContent = 'Hazte Premium'; btn.disabled = false;
+    showToast('Error: ' + (translateError(e.message) || 'Inténtalo de nuevo'));
+    btn.textContent = t('premium.btn'); btn.disabled = false;
   }
 });
 
@@ -1039,7 +1039,7 @@ document.getElementById('btn-go-premium').addEventListener('click', async () => 
   const params = new URLSearchParams(location.search);
   if (params.get('premium') === 'success') {
     history.replaceState({}, '', '/');
-    setTimeout(() => showToast('⭐ ¡Ya eres Premium! Gracias por tu apoyo'), 500);
+    setTimeout(() => showToast(t('toast.premium')), 500);
     AUTH.verify();
   } else if (params.get('premium') === 'cancel') {
     history.replaceState({}, '', '/');

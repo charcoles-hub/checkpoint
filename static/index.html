@@ -24,7 +24,8 @@
       <button class="btn-ghost" id="nav-explore" data-i18n="nav.explore">Explorar</button>
       <button class="btn-ghost" id="nav-ranking" data-i18n="nav.ranking">Ranking</button>
       <button class="btn-ghost" id="nav-community" data-i18n="nav.community">Comunidad</button>
-      <button class="btn-ghost" id="nav-mylist" style="display:none" data-i18n="nav.mylist">Mi lista</button>
+      <button class="btn-ghost" id="nav-mylist" style="display:none" data-i18n="nav.mylist">Mis juegos</button>
+      <button class="btn-ghost" id="nav-wishlist" style="display:none" data-i18n="nav.wishlist">Deseados</button>
       <div class="user-menu" id="user-menu" style="display:none">
         <button class="btn-user" id="btn-username"></button>
         <div class="user-dropdown" id="user-dropdown">
@@ -151,12 +152,11 @@
   <div id="view-mylist" style="display:none">
     <section class="games-section" style="padding-top:100px">
       <div class="section-header">
-        <h2 data-i18n="mylist.title">Mi lista de juegos</h2>
+        <h2 data-i18n="mylist.title">Mis juegos</h2>
         <div class="list-tabs" id="mylist-tabs">
           <button class="list-tab active" data-status="all" data-i18n="tab.all">Todos</button>
           <button class="list-tab" data-status="played" data-i18n="tab.played">Jugados</button>
           <button class="list-tab" data-status="playing" data-i18n="tab.playing">Jugando</button>
-          <button class="list-tab" data-status="wishlist" data-i18n="tab.wishlist">Deseados</button>
           <button class="list-tab" data-status="siguiendo" data-i18n="tab.following">Siguiendo</button>
         </div>
       </div>
@@ -173,6 +173,16 @@
         <h3 style="margin:32px 0 16px;font-size:1.1rem" data-i18n="alerts.title">Alertas de precio</h3>
         <div id="alerts-list"></div>
       </div>
+    </section>
+  </div>
+
+  <!-- WISHLIST VIEW -->
+  <div id="view-wishlist" style="display:none">
+    <section class="games-section" style="padding-top:100px">
+      <div class="section-header">
+        <h2 data-i18n="wishlist.title">Lista de deseos</h2>
+      </div>
+      <div class="games-grid" id="wishlist-grid"></div>
     </section>
   </div>
 </main>

@@ -19,7 +19,7 @@ let totalGames = 0;
 let genreCache = null;
 
 // ── Views ────────────────────────────────────────────
-const VIEWS = ['home', 'mylist', 'ranking', 'profile', 'explore', 'community'];
+const VIEWS = ['home', 'mylist', 'wishlist', 'ranking', 'profile', 'explore', 'community'];
 
 function showView(name) {
   VIEWS.forEach(v => {
@@ -46,6 +46,7 @@ document.addEventListener('click', e => {
 // ── Nav ──────────────────────────────────────────────
 document.getElementById('nav-home').addEventListener('click', e => { e.preventDefault(); history.pushState({}, '', '/'); resetHome(); closeMenu(); });
 document.getElementById('nav-mylist').addEventListener('click', () => { history.pushState({}, '', '/mylist'); showView('mylist'); loadMyList(); closeMenu(); });
+document.getElementById('nav-wishlist').addEventListener('click', () => { history.pushState({}, '', '/wishlist'); showView('wishlist'); loadWishlist(); closeMenu(); });
 document.getElementById('nav-ranking').addEventListener('click', () => { history.pushState({}, '', '/ranking'); showView('ranking'); loadRanking(); closeMenu(); });
 document.getElementById('nav-explore').addEventListener('click', () => { history.pushState({}, '', '/explore'); showView('explore'); loadExplore(); closeMenu(); });
 document.getElementById('nav-community').addEventListener('click', () => { history.pushState({}, '', '/community'); showView('community'); loadCommunity(); closeMenu(); });
@@ -79,6 +80,7 @@ function route() {
   }
   if (path === '/' || path === '') { showView('home'); loadGames(); initGenrePills(); }
   else if (path === '/mylist') { showView('mylist'); loadMyList(); }
+  else if (path === '/wishlist') { showView('wishlist'); loadWishlist(); }
   else if (path === '/ranking') { showView('ranking'); loadRanking(); }
   else if (path.startsWith('/explore')) {
     const genreKey = decodeURIComponent(path.replace('/explore/', '').replace('/explore', ''));
@@ -615,6 +617,10 @@ async function loadMyList() {
   let activeStatus = 'all';
   const [entries, alerts] = await Promise.all([AUTH.apiFetch('/api/list'), AUTH.apiFetch('/api/alerts')]);
 
+  // Remove stale elements from previous calls
+  document.querySelector('.list-search-box')?.remove();
+  document.getElementById('mylist-share-div')?.remove();
+
   // Search bar
   let listSearch = '';
   const searchBox = document.createElement('div');
@@ -639,7 +645,7 @@ async function loadMyList() {
     followingSection.style.display = 'none';
     alertsSection.style.display = '';
     searchBox.style.display = '';
-    let filtered = activeStatus === 'all' ? entries : entries.filter(e => e.status === activeStatus);
+    let filtered = activeStatus === 'all' ? entries.filter(e => e.status !== 'wishlist') : entries.filter(e => e.status === activeStatus);
     if (listSearch) filtered = filtered.filter(e => (e.game_name || '').toLowerCase().includes(listSearch));
     listGrid.innerHTML = '';
     if (!filtered.length) {
@@ -674,6 +680,7 @@ async function loadMyList() {
 
   const section = document.getElementById('alerts-section');
   const shareDiv = document.createElement('div');
+  shareDiv.id = 'mylist-share-div';
   shareDiv.style.cssText = 'margin-top:24px;padding:16px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;gap:12px;flex-wrap:wrap';
   const profileUrl = `${location.origin}/u/${AUTH.user.username}`;
   shareDiv.innerHTML = `
@@ -685,6 +692,28 @@ async function loadMyList() {
   document.getElementById('btn-copy-profile').addEventListener('click', () => {
     navigator.clipboard.writeText(profileUrl); showToast(t('toast.link_copied'));
   });
+}
+
+async function loadWishlist() {
+  if (!AUTH.user) { showView('home'); AUTH.showModal('login'); return; }
+  const wGrid = document.getElementById('wishlist-grid');
+  wGrid.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const entries = await AUTH.apiFetch('/api/list');
+    const wishlist = entries.filter(e => e.status === 'wishlist');
+    wGrid.innerHTML = '';
+    if (!wishlist.length) {
+      wGrid.innerHTML = `<div class="empty-state"><div class="empty-icon">⭐</div><h3>${t('wishlist.empty_title')}</h3><p>${t('wishlist.empty_desc')}</p></div>`;
+      return;
+    }
+    wishlist.forEach(e => wGrid.appendChild(renderCard(e, () => openModal(e.steam_appid), async () => {
+      await AUTH.apiFetch(`/api/list/${e.steam_appid}`, { method: 'DELETE' });
+      loadWishlist();
+      showToast(t('toast.game_removed'));
+    })));
+  } catch {
+    wGrid.innerHTML = `<div class="no-results">${t('error.games')}</div>`;
+  }
 }
 
 function renderAlerts(alerts) {

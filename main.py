@@ -106,6 +106,14 @@ def raw_price(po):
     if not po: return None
     return po["final"] / 100
 
+def fmt_spy_price(g):
+    price = g.get("price")
+    if price is None: return None
+    if price == 0: return "Gratis"
+    disc = g.get("discount", 0)
+    formatted = f"{price / 100:.2f}€"
+    return f"-{disc}% {formatted}" if disc else formatted
+
 def platforms(p: dict):
     m = {"windows": "PC", "mac": "Mac", "linux": "Linux"}
     return [m[k] for k, v in p.items() if v and k in m]
@@ -136,7 +144,8 @@ async def list_games(search: str = "", page: int = 1):
     ps = 24; s = (page - 1) * ps
     return {"results": [
         {"id": g["appid"], "name": g["name"], "image": img(g["appid"]),
-         "playtime": round(g.get("average_forever", 0) / 60, 1)}
+         "playtime": round(g.get("average_forever", 0) / 60, 1),
+         "price": fmt_spy_price(g)}
         for g in all_g[s:s + ps]
     ], "count": len(all_g)}
 
@@ -755,6 +764,7 @@ async def games_by_genre(genre_key: str, page: int = 1):
     return {"results": [
         {"id": g["appid"], "name": g["name"], "image": img(g["appid"]),
          "playtime": round(g.get("average_forever", 0) / 60, 1),
+         "price": fmt_spy_price(g),
          **community.get(g["appid"], {})}
         for g in chunk
     ], "count": len(all_g)}
@@ -763,6 +773,7 @@ async def games_by_genre(genre_key: str, page: int = 1):
 @app.get("/u/{username}")
 @app.get("/ranking")
 @app.get("/mylist")
+@app.get("/wishlist")
 @app.get("/explore")
 @app.get("/explore/{genre_key}")
 @app.get("/reset-password")

@@ -276,6 +276,23 @@ def me(user=Depends(require_auth)):
     return _pub(user)
 
 
+class ProfileIn(BaseModel):
+    username: str = Field(min_length=3, max_length=30)
+    bio: str = Field(default="", max_length=160)
+
+@app.patch("/api/auth/profile")
+@limiter.limit("10/minute")
+def update_profile(request: Request, body: ProfileIn, user=Depends(require_auth)):
+    db = get_db()
+    if body.username != user["username"]:
+        existing = db.execute("SELECT id FROM users WHERE username=? AND id!=?", (body.username, user["id"])).fetchone()
+        if existing:
+            db.close()
+            raise HTTPException(409, "Ese nombre de usuario ya está en uso")
+    db.execute("UPDATE users SET username=?, bio=? WHERE id=?", (body.username, body.bio, user["id"]))
+    db.commit(); db.close()
+    return _pub({**user, "username": body.username, "bio": body.bio})
+
 @app.patch("/api/auth/settings")
 def update_settings(body: dict, user=Depends(require_auth)):
     allowed = {"notify_ntfy", "steam_id"}
@@ -288,7 +305,7 @@ def update_settings(body: dict, user=Depends(require_auth)):
     return {"ok": True}
 
 
-def _pub(u): return {"id": u["id"], "username": u["username"], "email": u["email"], "notify_ntfy": u.get("notify_ntfy"), "is_premium": bool(u.get("is_premium", 0)), "steam_id": u.get("steam_id")}
+def _pub(u): return {"id": u["id"], "username": u["username"], "email": u["email"], "notify_ntfy": u.get("notify_ntfy"), "is_premium": bool(u.get("is_premium", 0)), "steam_id": u.get("steam_id"), "bio": u.get("bio") or ""}
 
 
 # ── Public profiles ────────────────────────────────────
@@ -772,6 +789,7 @@ async def games_by_genre(genre_key: str, page: int = 1):
 
 @app.get("/u/{username}")
 @app.get("/ranking")
+@app.get("/mi-perfil")
 @app.get("/mylist")
 @app.get("/wishlist")
 @app.get("/explore")

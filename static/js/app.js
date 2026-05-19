@@ -19,7 +19,7 @@ let totalGames = 0;
 let genreCache = null;
 
 // ── Views ────────────────────────────────────────────
-const VIEWS = ['home', 'mylist', 'wishlist', 'ranking', 'profile', 'explore', 'community'];
+const VIEWS = ['home', 'profile-me', 'ranking', 'profile', 'explore', 'community'];
 
 function showView(name) {
   VIEWS.forEach(v => {
@@ -45,8 +45,7 @@ document.addEventListener('click', e => {
 
 // ── Nav ──────────────────────────────────────────────
 document.getElementById('nav-home').addEventListener('click', e => { e.preventDefault(); history.pushState({}, '', '/'); resetHome(); closeMenu(); });
-document.getElementById('nav-mylist').addEventListener('click', () => { history.pushState({}, '', '/mylist'); showView('mylist'); loadMyList(); closeMenu(); });
-document.getElementById('nav-wishlist').addEventListener('click', () => { history.pushState({}, '', '/wishlist'); showView('wishlist'); loadWishlist(); closeMenu(); });
+document.getElementById('nav-profile-me').addEventListener('click', () => { history.pushState({}, '', '/mi-perfil'); showView('profile-me'); profileMeTab = 'mygames'; loadProfileMe(); closeMenu(); });
 document.getElementById('nav-ranking').addEventListener('click', () => { history.pushState({}, '', '/ranking'); showView('ranking'); loadRanking(); closeMenu(); });
 document.getElementById('nav-explore').addEventListener('click', () => { history.pushState({}, '', '/explore'); showView('explore'); loadExplore(); closeMenu(); });
 document.getElementById('nav-community').addEventListener('click', () => { history.pushState({}, '', '/community'); showView('community'); loadCommunity(); closeMenu(); });
@@ -79,8 +78,9 @@ function route() {
     return;
   }
   if (path === '/' || path === '') { showView('home'); loadGames(); initGenrePills(); }
-  else if (path === '/mylist') { showView('mylist'); loadMyList(); }
-  else if (path === '/wishlist') { showView('wishlist'); loadWishlist(); }
+  else if (path === '/mi-perfil') { showView('profile-me'); loadProfileMe(); }
+  else if (path === '/mylist') { history.replaceState({}, '', '/mi-perfil'); showView('profile-me'); profileMeTab = 'mygames'; loadProfileMe(); }
+  else if (path === '/wishlist') { history.replaceState({}, '', '/mi-perfil'); showView('profile-me'); profileMeTab = 'wishlist'; loadProfileMe(); }
   else if (path === '/ranking') { showView('ranking'); loadRanking(); }
   else if (path.startsWith('/explore')) {
     const genreKey = decodeURIComponent(path.replace('/explore/', '').replace('/explore', ''));
@@ -611,6 +611,105 @@ async function saveEntry(g, status) {
 
 function closeModal() { modalOverlay.classList.remove('open'); document.body.style.overflow = ''; }
 
+// ── Mi Perfil ─────────────────────────────────────────
+let profileMeTab = 'mygames';
+
+function loadProfileMe() {
+  if (!AUTH.user) { showView('home'); AUTH.showModal('login'); return; }
+  document.getElementById('profile-me-avatar').textContent = AUTH.user.username[0].toUpperCase();
+  document.getElementById('profile-me-name').textContent = AUTH.user.username;
+  document.getElementById('profile-me-bio-display').textContent = AUTH.user.bio || '';
+
+  document.querySelectorAll('#profile-me-tabs .list-tab').forEach(tab => {
+    const fresh = tab.cloneNode(true);
+    tab.parentNode.replaceChild(fresh, tab);
+    fresh.addEventListener('click', () => {
+      document.querySelectorAll('#profile-me-tabs .list-tab').forEach(t => t.classList.remove('active'));
+      fresh.classList.add('active');
+      switchProfileTab(fresh.dataset.tab);
+    });
+  });
+  document.querySelectorAll('#profile-me-tabs .list-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.tab === profileMeTab);
+  });
+  switchProfileTab(profileMeTab);
+}
+
+function switchProfileTab(tab) {
+  profileMeTab = tab;
+  ['mygames', 'wishlist', 'account'].forEach(p => {
+    document.getElementById(`panel-${p}`).style.display = p === tab ? '' : 'none';
+  });
+  if (tab === 'mygames') loadMyList();
+  else if (tab === 'wishlist') loadWishlist();
+  else if (tab === 'account') loadMyAccount();
+}
+
+function loadMyAccount() {
+  const el = document.getElementById('account-content');
+  const profileUrl = `${location.origin}/u/${AUTH.user.username}`;
+  el.innerHTML = `
+    <div style="max-width:480px">
+      <p style="font-size:0.78rem;color:var(--muted2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:20px">${t('profile_me.section_edit')}</p>
+
+      <label style="font-size:0.85rem;color:var(--muted);display:block;margin-bottom:6px">${t('profile_me.label_username')}</label>
+      <input type="text" id="account-username" class="field-input" value="${escHtml(AUTH.user.username)}" maxlength="30" style="margin-bottom:16px" />
+
+      <label style="font-size:0.85rem;color:var(--muted);display:block;margin-bottom:6px">
+        ${t('profile_me.label_bio')}
+        <span style="color:var(--muted2);font-size:0.78rem;margin-left:4px">${t('profile_me.bio_hint')}</span>
+      </label>
+      <textarea id="account-bio" class="field-input" rows="3" maxlength="160" placeholder="${t('profile_me.bio_placeholder')}" style="resize:vertical;margin-bottom:6px">${escHtml(AUTH.user.bio || '')}</textarea>
+      <div style="text-align:right;font-size:0.78rem;color:var(--muted);margin-bottom:22px"><span id="bio-char-count">${(AUTH.user.bio || '').length}</span>/160</div>
+
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:32px">
+        <button class="btn-primary" id="btn-save-account">${t('profile_me.btn_save')}</button>
+        <span id="account-msg" style="display:none;font-size:0.9rem"></span>
+      </div>
+
+      <div style="padding:16px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <span style="color:var(--muted2);font-size:0.88rem">${t('mylist.profile_url')}</span>
+        <code style="color:var(--cyan);font-size:0.84rem;flex:1">${profileUrl}</code>
+        <button class="btn-ghost" id="btn-copy-profile-acc" style="padding:6px 14px;font-size:0.84rem">${t('mylist.btn_copy')}</button>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('account-bio').addEventListener('input', e => {
+    document.getElementById('bio-char-count').textContent = e.target.value.length;
+  });
+
+  document.getElementById('btn-save-account').addEventListener('click', async () => {
+    const username = document.getElementById('account-username').value.trim();
+    const bio = document.getElementById('account-bio').value.trim();
+    const btn = document.getElementById('btn-save-account');
+    const msg = document.getElementById('account-msg');
+    if (!username) return;
+    btn.disabled = true; btn.textContent = t('profile_me.btn_saving');
+    try {
+      const updated = await AUTH.apiFetch('/api/auth/profile', { method: 'PATCH', body: JSON.stringify({ username, bio }) });
+      AUTH.user.username = updated.username;
+      AUTH.user.bio = updated.bio;
+      localStorage.setItem('gl_user', JSON.stringify(AUTH.user));
+      AUTH.updateUI();
+      document.getElementById('profile-me-avatar').textContent = AUTH.user.username[0].toUpperCase();
+      document.getElementById('profile-me-name').textContent = AUTH.user.username;
+      document.getElementById('profile-me-bio-display').textContent = AUTH.user.bio || '';
+      msg.innerHTML = `<span style="color:var(--cyan)">✓ ${t('profile_me.saved')}</span>`;
+      msg.style.display = '';
+      loadMyAccount();
+    } catch (err) {
+      msg.innerHTML = `<span style="color:#ef4444">${err.message}</span>`;
+      msg.style.display = '';
+      btn.disabled = false; btn.textContent = t('profile_me.btn_save');
+    }
+  });
+
+  document.getElementById('btn-copy-profile-acc').addEventListener('click', () => {
+    navigator.clipboard.writeText(profileUrl); showToast(t('toast.link_copied'));
+  });
+}
+
 // ── My List ──────────────────────────────────────────
 async function loadMyList() {
   if (!AUTH.user) { showView('home'); AUTH.showModal('login'); return; }
@@ -619,9 +718,7 @@ async function loadMyList() {
   let activeStatus = 'all';
   const entries = await AUTH.apiFetch('/api/list');
 
-  // Remove stale elements from previous calls
   document.querySelector('.list-search-box')?.remove();
-  document.getElementById('mylist-share-div')?.remove();
 
   // Search bar
   let listSearch = '';
@@ -668,19 +765,6 @@ async function loadMyList() {
   });
 
   renderList();
-  const shareDiv = document.createElement('div');
-  shareDiv.id = 'mylist-share-div';
-  shareDiv.style.cssText = 'margin-top:24px;padding:16px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;gap:12px;flex-wrap:wrap';
-  const profileUrl = `${location.origin}/u/${AUTH.user.username}`;
-  shareDiv.innerHTML = `
-    <span style="color:var(--muted2);font-size:0.9rem">${t('mylist.profile_url')}</span>
-    <code style="color:var(--cyan);font-size:0.85rem;flex:1">${profileUrl}</code>
-    <button class="btn-ghost" id="btn-copy-profile" style="padding:6px 14px;font-size:0.85rem">${t('mylist.btn_copy')}</button>
-  `;
-  listGrid.parentNode.appendChild(shareDiv);
-  document.getElementById('btn-copy-profile').addEventListener('click', () => {
-    navigator.clipboard.writeText(profileUrl); showToast(t('toast.link_copied'));
-  });
 }
 
 async function loadWishlist() {

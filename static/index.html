@@ -24,8 +24,7 @@
       <button class="btn-ghost" id="nav-explore" data-i18n="nav.explore">Explorar</button>
       <button class="btn-ghost" id="nav-ranking" data-i18n="nav.ranking">Ranking</button>
       <button class="btn-ghost" id="nav-community" data-i18n="nav.community">Comunidad</button>
-      <button class="btn-ghost" id="nav-mylist" style="display:none" data-i18n="nav.mylist">Mis juegos</button>
-      <button class="btn-ghost" id="nav-wishlist" style="display:none" data-i18n="nav.wishlist">Deseados</button>
+      <button class="btn-ghost" id="nav-profile-me" style="display:none" data-i18n="nav.profile_me">Mi perfil</button>
       <div class="user-menu" id="user-menu" style="display:none">
         <button class="btn-user" id="btn-username"></button>
         <div class="user-dropdown" id="user-dropdown">
@@ -148,32 +147,50 @@
     </section>
   </div>
 
-  <!-- MY LIST VIEW -->
-  <div id="view-mylist" style="display:none">
+  <!-- MI PERFIL VIEW -->
+  <div id="view-profile-me" style="display:none">
     <section class="games-section" style="padding-top:100px">
-      <div class="section-header">
-        <h2 data-i18n="mylist.title">Mis juegos</h2>
-        <div class="list-tabs" id="mylist-tabs">
+
+      <!-- Hero -->
+      <div style="display:flex;align-items:center;gap:20px;margin-bottom:28px">
+        <div id="profile-me-avatar" style="width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,var(--purple),var(--cyan));display:flex;align-items:center;justify-content:center;font-size:1.7rem;font-weight:700;color:#fff;flex-shrink:0"></div>
+        <div>
+          <h2 style="font-size:1.3rem;margin:0" id="profile-me-name"></h2>
+          <p style="color:var(--muted);font-size:0.88rem;margin:4px 0 0;max-width:400px" id="profile-me-bio-display"></p>
+        </div>
+      </div>
+
+      <!-- Secciones -->
+      <div class="list-tabs" id="profile-me-tabs" style="margin-bottom:28px">
+        <button class="list-tab active" data-tab="mygames" data-i18n="nav.mylist">Mis juegos</button>
+        <button class="list-tab" data-tab="wishlist" data-i18n="nav.wishlist">Deseados</button>
+        <button class="list-tab" data-tab="account" data-i18n="profile_me.tab_account">Mi cuenta</button>
+      </div>
+
+      <!-- Panel: Mis juegos -->
+      <div id="panel-mygames">
+        <div class="list-tabs" id="mylist-tabs" style="margin-bottom:20px">
           <button class="list-tab active" data-status="all" data-i18n="tab.all">Todos</button>
           <button class="list-tab" data-status="played" data-i18n="tab.played">Jugados</button>
           <button class="list-tab" data-status="playing" data-i18n="tab.playing">Jugando</button>
         </div>
+        <div class="games-grid" id="mylist-grid"></div>
       </div>
-      <div class="games-grid" id="mylist-grid"></div>
-    </section>
-  </div>
 
-  <!-- WISHLIST VIEW -->
-  <div id="view-wishlist" style="display:none">
-    <section class="games-section" style="padding-top:100px">
-      <div class="section-header">
-        <h2 data-i18n="wishlist.title">Lista de deseos</h2>
+      <!-- Panel: Deseados -->
+      <div id="panel-wishlist" style="display:none">
+        <div class="games-grid" id="wishlist-grid"></div>
+        <div class="alerts-section" id="alerts-section">
+          <h3 style="margin:32px 0 16px;font-size:1.1rem" data-i18n="alerts.title">Alertas de precio</h3>
+          <div id="alerts-list"></div>
+        </div>
       </div>
-      <div class="games-grid" id="wishlist-grid"></div>
-      <div class="alerts-section" id="alerts-section">
-        <h3 style="margin:32px 0 16px;font-size:1.1rem" data-i18n="alerts.title">Alertas de precio</h3>
-        <div id="alerts-list"></div>
+
+      <!-- Panel: Mi cuenta -->
+      <div id="panel-account" style="display:none">
+        <div id="account-content"></div>
       </div>
+
     </section>
   </div>
 </main>

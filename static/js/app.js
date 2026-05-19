@@ -535,9 +535,13 @@ async function openModal(gameId) {
     document.getElementById('modal-btn-wishlist').addEventListener('click', async () => {
       if (!AUTH.user) { AUTH.showModal('login'); return; }
       await saveEntry(g, 'wishlist');
-      document.getElementById('alert-form').style.display = '';
       document.getElementById('rating-form').style.display = 'none';
-      document.getElementById('alert-price-input').focus();
+      if (AUTH.user.is_premium) {
+        document.getElementById('alert-form').style.display = '';
+        document.getElementById('alert-price-input').focus();
+      } else {
+        showToast(t('toast.wishlist_added'));
+      }
     });
     document.getElementById('btn-save-rating').addEventListener('click', async () => {
       const rating = parseInt(document.getElementById('stars-container').dataset.value) || null;
@@ -611,11 +615,9 @@ function closeModal() { modalOverlay.classList.remove('open'); document.body.sty
 async function loadMyList() {
   if (!AUTH.user) { showView('home'); AUTH.showModal('login'); return; }
   const listGrid = document.getElementById('mylist-grid');
-  const followingSection = document.getElementById('following-section');
-  const alertsSection = document.getElementById('alerts-section');
   listGrid.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
   let activeStatus = 'all';
-  const [entries, alerts] = await Promise.all([AUTH.apiFetch('/api/list'), AUTH.apiFetch('/api/alerts')]);
+  const entries = await AUTH.apiFetch('/api/list');
 
   // Remove stale elements from previous calls
   document.querySelector('.list-search-box')?.remove();
@@ -633,17 +635,7 @@ async function loadMyList() {
   });
 
   function renderList() {
-    if (activeStatus === 'siguiendo') {
-      listGrid.style.display = 'none';
-      followingSection.style.display = '';
-      alertsSection.style.display = 'none';
-      searchBox.style.display = 'none';
-      loadFollowingSection();
-      return;
-    }
     listGrid.style.display = '';
-    followingSection.style.display = 'none';
-    alertsSection.style.display = '';
     searchBox.style.display = '';
     let filtered = activeStatus === 'all' ? entries.filter(e => e.status !== 'wishlist') : entries.filter(e => e.status === activeStatus);
     if (listSearch) filtered = filtered.filter(e => (e.game_name || '').toLowerCase().includes(listSearch));
@@ -676,9 +668,6 @@ async function loadMyList() {
   });
 
   renderList();
-  renderAlerts(alerts);
-
-  const section = document.getElementById('alerts-section');
   const shareDiv = document.createElement('div');
   shareDiv.id = 'mylist-share-div';
   shareDiv.style.cssText = 'margin-top:24px;padding:16px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;gap:12px;flex-wrap:wrap';
@@ -688,7 +677,7 @@ async function loadMyList() {
     <code style="color:var(--cyan);font-size:0.85rem;flex:1">${profileUrl}</code>
     <button class="btn-ghost" id="btn-copy-profile" style="padding:6px 14px;font-size:0.85rem">${t('mylist.btn_copy')}</button>
   `;
-  section.appendChild(shareDiv);
+  listGrid.parentNode.appendChild(shareDiv);
   document.getElementById('btn-copy-profile').addEventListener('click', () => {
     navigator.clipboard.writeText(profileUrl); showToast(t('toast.link_copied'));
   });
@@ -697,20 +686,36 @@ async function loadMyList() {
 async function loadWishlist() {
   if (!AUTH.user) { showView('home'); AUTH.showModal('login'); return; }
   const wGrid = document.getElementById('wishlist-grid');
+  const alertsEl = document.getElementById('alerts-list');
   wGrid.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  alertsEl.innerHTML = '';
+
   try {
-    const entries = await AUTH.apiFetch('/api/list');
+    const fetchAlerts = AUTH.user.is_premium ? AUTH.apiFetch('/api/alerts') : Promise.resolve(null);
+    const [entries, alerts] = await Promise.all([AUTH.apiFetch('/api/list'), fetchAlerts]);
     const wishlist = entries.filter(e => e.status === 'wishlist');
     wGrid.innerHTML = '';
     if (!wishlist.length) {
       wGrid.innerHTML = `<div class="empty-state"><div class="empty-icon">⭐</div><h3>${t('wishlist.empty_title')}</h3><p>${t('wishlist.empty_desc')}</p></div>`;
-      return;
+    } else {
+      wishlist.forEach(e => wGrid.appendChild(renderCard(e, () => openModal(e.steam_appid), async () => {
+        await AUTH.apiFetch(`/api/list/${e.steam_appid}`, { method: 'DELETE' });
+        loadWishlist();
+        showToast(t('toast.game_removed'));
+      })));
     }
-    wishlist.forEach(e => wGrid.appendChild(renderCard(e, () => openModal(e.steam_appid), async () => {
-      await AUTH.apiFetch(`/api/list/${e.steam_appid}`, { method: 'DELETE' });
-      loadWishlist();
-      showToast(t('toast.game_removed'));
-    })));
+
+    if (!AUTH.user.is_premium) {
+      alertsEl.innerHTML = `
+        <div style="padding:24px;background:linear-gradient(135deg,var(--surface2),var(--surface));border:1px solid var(--border);border-radius:14px;text-align:center;max-width:540px">
+          <div style="font-size:2rem;margin-bottom:10px">🔔</div>
+          <h4 style="font-size:1.05rem;margin-bottom:8px">${t('alerts.promo_title')}</h4>
+          <p style="color:var(--muted);font-size:0.9rem;margin-bottom:18px;line-height:1.5">${t('alerts.promo_desc')}</p>
+          <button class="btn-primary" onclick="showPremiumModal()" style="font-size:0.9rem">⭐ ${t('alerts.promo_btn')}</button>
+        </div>`;
+    } else {
+      renderAlerts(alerts || []);
+    }
   } catch {
     wGrid.innerHTML = `<div class="no-results">${t('error.games')}</div>`;
   }
@@ -718,20 +723,8 @@ async function loadWishlist() {
 
 function renderAlerts(alerts) {
   const el = document.getElementById('alerts-list');
-  const active = alerts.filter(a => !a.triggered);
-  const isPremium = AUTH.user?.is_premium;
-  const limitBar = !isPremium ? `
-    <div style="margin-bottom:12px;padding:10px 14px;background:var(--surface2);border-radius:8px;display:flex;align-items:center;justify-content:space-between;gap:12px">
-      <div style="flex:1">
-        <div style="font-size:0.82rem;color:var(--muted2);margin-bottom:6px">${t('alerts.used', {n: active.length})}</div>
-        <div style="height:4px;background:var(--border);border-radius:2px">
-          <div style="height:4px;background:${active.length >= 3 ? '#ef4444' : 'var(--purple)'};border-radius:2px;width:${Math.min(active.length/3*100,100)}%"></div>
-        </div>
-      </div>
-      ${active.length >= 3 ? `<button class="btn-follow" onclick="showPremiumModal()" style="font-size:0.8rem">⭐ Premium</button>` : ''}
-    </div>` : '';
-  if (!alerts.length) { el.innerHTML = limitBar + `<p style="color:var(--muted)">${t('alerts.empty')}</p>`; return; }
-  el.innerHTML = limitBar + alerts.map(a => `
+  if (!alerts.length) { el.innerHTML = `<p style="color:var(--muted)">${t('alerts.empty')}</p>`; return; }
+  el.innerHTML = alerts.map(a => `
     <div class="alert-row ${a.triggered ? 'alert-triggered' : ''}">
       <img src="${a.game_image || ''}" class="alert-thumb" onerror="this.style.display='none'" />
       <div class="alert-info">

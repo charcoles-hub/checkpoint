@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GameLog</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="nav-inner">
+    <a class="logo" href="#" id="nav-home">
+      <span class="logo-icon">◈</span>
+      <span>GameLog</span>
+    </a>
+    <div class="nav-right">
+      <button class="btn-ghost" id="nav-explore">Explorar</button>
+      <button class="btn-ghost" id="nav-ranking">Ranking</button>
+      <button class="btn-ghost" id="nav-mylist" style="display:none">Mi lista</button>
+      <div class="user-menu" id="user-menu" style="display:none">
+        <button class="btn-user" id="btn-username"></button>
+        <div class="user-dropdown" id="user-dropdown">
+          <button id="btn-settings">Notificaciones</button>
+          <button id="btn-logout">Cerrar sesión</button>
+        </div>
+      </div>
+      <button class="btn-ghost" id="btn-login">Iniciar sesión</button>
+      <button class="btn-primary" id="btn-register">Registrarse</button>
+    </div>
+  </div>
+</nav>
+
+<main>
+  <!-- HOME VIEW -->
+  <div id="view-home">
+    <section class="hero">
+      <div class="hero-bg"></div>
+      <div class="hero-content">
+        <h1>Tu diario de <span class="gradient-text">videojuegos</span></h1>
+        <p>Registra lo que has jugado, puntúa, escribe tus opiniones y compártelas con otros jugadores.</p>
+        <div class="search-bar">
+          <span class="search-icon">⌕</span>
+          <input type="text" id="search-input" placeholder="Buscar un juego..." autocomplete="off" />
+        </div>
+        <!-- Genre pills (browse mode) -->
+        <div class="genre-pills" id="genre-pills">
+          <button class="genre-pill active" data-genre="">Todos</button>
+        </div>
+        <!-- Platform filter (search mode) -->
+        <div class="platform-filter" id="platform-filter" style="display:none">
+          <span style="color:var(--muted);font-size:0.85rem">Plataforma:</span>
+          <button class="platform-pill active" data-platform="">Todas</button>
+          <button class="platform-pill" data-platform="PC">PC</button>
+          <button class="platform-pill" data-platform="Mac">Mac</button>
+          <button class="platform-pill" data-platform="linux">Linux</button>
+        </div>
+      </div>
+    </section>
+    <section class="games-section">
+      <div class="section-header">
+        <h2 id="section-title">Juegos populares</h2>
+        <div class="sort-tabs" id="sort-tabs">
+          <button class="sort-tab active" data-sort="popular">Popularidad</button>
+          <button class="sort-tab" data-sort="community">Valoración comunidad</button>
+        </div>
+      </div>
+      <div class="games-grid" id="games-grid">
+        <div class="loading"><div class="spinner"></div><p>Cargando juegos...</p></div>
+      </div>
+      <div class="pagination" id="pagination"></div>
+    </section>
+  </div>
+
+  <!-- EXPLORE VIEW -->
+  <div id="view-explore" style="display:none">
+    <section class="games-section" style="padding-top:100px">
+      <div class="section-header">
+        <h2 id="explore-title">Explorar por género</h2>
+        <div class="sort-tabs" id="genre-sort-tabs" style="display:none">
+          <button class="sort-tab active" data-sort="popular">Popularidad</button>
+          <button class="sort-tab" data-sort="community">Mejor valorados</button>
+        </div>
+      </div>
+      <div id="explore-content"></div>
+      <div class="pagination" id="explore-pagination"></div>
+    </section>
+  </div>
+
+  <!-- RANKING VIEW -->
+  <div id="view-ranking" style="display:none">
+    <section class="games-section" style="padding-top:100px">
+      <div class="section-header">
+        <h2>🏆 Ranking de la comunidad</h2>
+        <span style="color:var(--muted);font-size:0.9rem">Top juegos mejor valorados por usuarios</span>
+      </div>
+      <div id="ranking-list"></div>
+    </section>
+  </div>
+
+  <!-- PROFILE VIEW -->
+  <div id="view-profile" style="display:none">
+    <section class="games-section" style="padding-top:100px">
+      <div id="profile-header"></div>
+      <div class="section-header" style="margin-top:32px">
+        <h2>Juegos</h2>
+        <div class="list-tabs" id="profile-tabs">
+          <button class="list-tab active" data-status="all">Todos</button>
+          <button class="list-tab" data-status="played">Jugados</button>
+          <button class="list-tab" data-status="playing">Jugando</button>
+          <button class="list-tab" data-status="wishlist">Deseados</button>
+        </div>
+      </div>
+      <div class="games-grid" id="profile-grid"></div>
+    </section>
+  </div>
+
+  <!-- MY LIST VIEW -->
+  <div id="view-mylist" style="display:none">
+    <section class="games-section" style="padding-top:100px">
+      <div class="section-header">
+        <h2>Mi lista de juegos</h2>
+        <div class="list-tabs">
+          <button class="list-tab active" data-status="all">Todos</button>
+          <button class="list-tab" data-status="played">Jugados</button>
+          <button class="list-tab" data-status="playing">Jugando</button>
+          <button class="list-tab" data-status="wishlist">Deseados</button>
+        </div>
+      </div>
+      <div class="games-grid" id="mylist-grid"></div>
+      <div class="alerts-section" id="alerts-section">
+        <h3 style="margin:32px 0 16px;font-size:1.1rem">Alertas de precio</h3>
+        <div id="alerts-list"></div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<!-- Game detail modal -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal" id="modal">
+    <button class="modal-close" id="modal-close">✕</button>
+    <div class="modal-content" id="modal-content">
+      <div class="loading"><div class="spinner"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Auth modal -->
+<div class="modal-overlay" id="auth-overlay">
+  <div class="modal modal-sm" id="auth-modal">
+    <button class="modal-close" id="auth-close">✕</button>
+    <div style="padding:32px 28px">
+      <div class="auth-tabs">
+        <button class="auth-tab active" id="tab-login" data-tab="login">Iniciar sesión</button>
+        <button class="auth-tab" id="tab-register" data-tab="register">Registrarse</button>
+      </div>
+      <div id="auth-error" class="auth-error" style="display:none"></div>
+
+      <form id="form-login">
+        <label class="field-label">Email</label>
+        <input class="field-input" type="email" id="login-email" required placeholder="tu@email.com" />
+        <label class="field-label">Contraseña</label>
+        <input class="field-input" type="password" id="login-password" required placeholder="••••••" />
+        <button class="btn-primary w-full" type="submit">Entrar</button>
+      </form>
+
+      <form id="form-register" style="display:none">
+        <label class="field-label">Nombre de usuario</label>
+        <input class="field-input" type="text" id="reg-username" required placeholder="gamer123" minlength="3" />
+        <label class="field-label">Email</label>
+        <input class="field-input" type="email" id="reg-email" required placeholder="tu@email.com" />
+        <label class="field-label">Contraseña</label>
+        <input class="field-input" type="password" id="reg-password" required placeholder="Mínimo 6 caracteres" minlength="6" />
+        <button class="btn-primary w-full" type="submit">Crear cuenta</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Settings modal -->
+<div class="modal-overlay" id="settings-overlay">
+  <div class="modal modal-sm" id="settings-modal">
+    <button class="modal-close" id="settings-close">✕</button>
+    <div style="padding:32px 28px">
+      <h3 style="margin-bottom:20px;font-size:1.2rem;font-weight:700">Notificaciones</h3>
+      <label class="field-label">Topic de ntfy.sh (para alertas de precio)</label>
+      <input class="field-input" type="text" id="ntfy-topic" placeholder="mi-topic-secreto" />
+      <p style="color:var(--muted);font-size:0.8rem;margin:-8px 0 16px">Recibirás una notificación push en ntfy.sh cuando baje el precio. Deja vacío para desactivar.</p>
+      <button class="btn-primary w-full" id="btn-save-settings">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/auth.js"></script>
+<script src="/js/app.js"></script>
+</body>
+</html>

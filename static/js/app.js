@@ -581,7 +581,7 @@ async function openModal(gameId) {
       await AUTH.apiFetch(`/api/list/${g.id}`, { method: 'DELETE' });
       closeModal();
       showToast(t('toast.game_removed'));
-      if (document.getElementById('view-mylist').style.display !== 'none') loadMyList();
+      if (document.getElementById('view-profile-me').style.display !== 'none') loadMyList();
     });
     document.getElementById('btn-save-draft')?.addEventListener('click', async () => {
       if (!AUTH.user) { AUTH.showModal('login'); return; }
@@ -1246,8 +1246,10 @@ async function openSteamImport(steamId) {
         });
         steamOverlay.classList.remove('open');
         showToast(t('toast.steam_imported', {n: result.imported}));
-        followingLoaded = false;
-        if (document.getElementById('view-mylist').style.display !== 'none') loadMyList();
+        history.pushState({}, '', '/mi-perfil');
+        showView('profile-me');
+        profileMeTab = 'mygames';
+        loadProfileMe();
       } catch (e) {
         showToast(translateError(e.message));
         btn.disabled = false; btn.textContent = t('steam.btn_import');

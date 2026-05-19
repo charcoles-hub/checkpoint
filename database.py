@@ -10,8 +10,18 @@ class _PGConn:
     def __init__(self, url: str):
         import psycopg2
         import psycopg2.extras
-        self._conn = psycopg2.connect(url, sslmode="require",
-                                      cursor_factory=psycopg2.extras.RealDictCursor)
+        from urllib.parse import urlparse, unquote
+        # Parse URL manually so special chars in password (^, %) work correctly
+        p = urlparse(url)
+        self._conn = psycopg2.connect(
+            host=p.hostname,
+            port=p.port or 5432,
+            dbname=p.path.lstrip('/'),
+            user=unquote(p.username or ''),
+            password=unquote(p.password or ''),
+            sslmode="require",
+            cursor_factory=psycopg2.extras.RealDictCursor
+        )
 
     def execute(self, sql: str, params=()):
         sql = sql.replace("?", "%s")

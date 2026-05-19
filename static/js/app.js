@@ -24,11 +24,26 @@ function showView(name) {
   });
 }
 
+// ── Nav hamburger ────────────────────────────────────
+const hamburger = document.getElementById('hamburger');
+const navRight = document.getElementById('nav-right');
+hamburger.addEventListener('click', () => {
+  hamburger.classList.toggle('open');
+  navRight.classList.toggle('open');
+});
+function closeMenu() {
+  hamburger.classList.remove('open');
+  navRight.classList.remove('open');
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('.nav-inner')) closeMenu();
+});
+
 // ── Nav ──────────────────────────────────────────────
-document.getElementById('nav-home').addEventListener('click', e => { e.preventDefault(); history.pushState({}, '', '/'); resetHome(); });
-document.getElementById('nav-mylist').addEventListener('click', () => { history.pushState({}, '', '/mylist'); showView('mylist'); loadMyList(); });
-document.getElementById('nav-ranking').addEventListener('click', () => { history.pushState({}, '', '/ranking'); showView('ranking'); loadRanking(); });
-document.getElementById('nav-explore').addEventListener('click', () => { history.pushState({}, '', '/explore'); showView('explore'); loadExplore(); });
+document.getElementById('nav-home').addEventListener('click', e => { e.preventDefault(); history.pushState({}, '', '/'); resetHome(); closeMenu(); });
+document.getElementById('nav-mylist').addEventListener('click', () => { history.pushState({}, '', '/mylist'); showView('mylist'); loadMyList(); closeMenu(); });
+document.getElementById('nav-ranking').addEventListener('click', () => { history.pushState({}, '', '/ranking'); showView('ranking'); loadRanking(); closeMenu(); });
+document.getElementById('nav-explore').addEventListener('click', () => { history.pushState({}, '', '/explore'); showView('explore'); loadExplore(); closeMenu(); });
 
 function resetHome() {
   currentPage = 1; currentSearch = ''; currentGenre = ''; currentPlatform = ''; currentSort = 'popular';

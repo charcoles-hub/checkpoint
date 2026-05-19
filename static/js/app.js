@@ -66,6 +66,25 @@ function resetHome() {
 // ── Routing ──────────────────────────────────────────
 function route() {
   const path = location.pathname;
+  const params = new URLSearchParams(location.search);
+
+  // Handle Google OAuth redirect back
+  const glToken = params.get('gl_token');
+  if (glToken) {
+    history.replaceState({}, '', '/');
+    AUTH.token = glToken;
+    localStorage.setItem('gl_token', glToken);
+    AUTH.verify().then(() => showToast(t('toast.login_ok')));
+  }
+  const authError = params.get('auth_error');
+  if (authError) {
+    history.replaceState({}, '', '/');
+    setTimeout(() => {
+      AUTH.showModal('login');
+      AUTH.showError(t('auth.google_error'));
+    }, 200);
+  }
+
   if (path === '/reset-password') {
     const token = new URLSearchParams(location.search).get('token');
     showView('home'); loadGames(); initGenrePills();

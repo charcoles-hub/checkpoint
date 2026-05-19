@@ -68,6 +68,7 @@ def _init_sqlite():
         ("users", "stripe_subscription_id", "TEXT"),
         ("users", "steam_id", "TEXT"),
         ("users", "bio", "TEXT"),
+        ("users", "google_id", "TEXT"),
     ]:
         try:
             db.execute(f"ALTER TABLE {table} ADD COLUMN {col} {definition}")
@@ -85,6 +86,7 @@ def _init_sqlite():
             stripe_customer_id     TEXT,
             stripe_subscription_id TEXT,
             steam_id               TEXT,
+            google_id              TEXT,
             created_at             TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
         CREATE TABLE IF NOT EXISTS game_entries (
@@ -144,6 +146,7 @@ def _init_pg():
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_subscription_id TEXT",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS steam_id TEXT",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id TEXT",
     ]
     for m in migrations:
         try:
@@ -162,6 +165,7 @@ def _init_pg():
             stripe_customer_id     TEXT,
             stripe_subscription_id TEXT,
             steam_id               TEXT,
+            google_id              TEXT,
             created_at             TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )""",
         """CREATE TABLE IF NOT EXISTS game_entries (

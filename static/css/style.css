@@ -350,6 +350,24 @@ body {
 }
 .w-full { width: 100%; margin-top: 20px; padding: 12px; font-size: 1rem; }
 
+/* GOOGLE BUTTON */
+.btn-google {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  background: #fff; color: #3c4043; border: 1px solid #dadce0; border-radius: 8px;
+  padding: 10px 14px; font-size: 0.95rem; font-weight: 500; cursor: pointer;
+  text-decoration: none; transition: box-shadow 0.2s, background 0.2s;
+  margin-top: 0; margin-bottom: 4px;
+}
+.btn-google:hover { box-shadow: 0 1px 6px rgba(0,0,0,0.3); background: #f8f8f8; }
+
+.auth-divider {
+  display: flex; align-items: center; gap: 12px;
+  color: var(--muted); font-size: 0.85rem; margin: 16px 0;
+}
+.auth-divider::before, .auth-divider::after {
+  content: ''; flex: 1; height: 1px; background: var(--border);
+}
+
 /* USER MENU */
 .user-menu { position: relative; }
 .btn-user {

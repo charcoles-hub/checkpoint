@@ -1,5 +1,6 @@
 import asyncio
 import os
+import re
 import secrets
 import stripe
 from contextlib import asynccontextmanager
@@ -52,6 +53,8 @@ STRIPE_PRICE_ID = os.getenv("STRIPE_PRICE_ID", "")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
 APP_URL = os.getenv("APP_URL", "https://mycheckpoint.games")
 STEAM_API_KEY = os.getenv("STEAM_API_KEY", "")
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
 if STRIPE_SECRET_KEY:
     stripe.api_key = STRIPE_SECRET_KEY
 
@@ -310,6 +313,16 @@ def update_settings(body: dict, user=Depends(require_auth)):
 def _pub(u): return {"id": u["id"], "username": u["username"], "email": u["email"], "notify_ntfy": u.get("notify_ntfy"), "is_premium": bool(u.get("is_premium", 0)), "steam_id": u.get("steam_id"), "bio": u.get("bio") or ""}
 
 
+def _unique_username(db, base: str) -> str:
+    base = re.sub(r'[^a-zA-Z0-9_]', '', base)[:20] or "user"
+    username = base
+    n = 1
+    while db.execute("SELECT id FROM users WHERE username=?", (username,)).fetchone():
+        username = f"{base}{n}"
+        n += 1
+    return username
+
+
 # ── Public profiles ────────────────────────────────────
 @app.get("/api/users/search")
 def search_users(q: str = "", user=Depends(current_user)):
@@ -543,6 +556,80 @@ def delete_alert(appid: int, user=Depends(require_auth)):
     db.execute("DELETE FROM price_alerts WHERE user_id=? AND steam_appid=?", (user["id"], appid))
     db.commit(); db.close()
     return {"ok": True}
+
+
+# ── Google OAuth ──────────────────────────────────────
+@app.get("/api/auth/google")
+async def google_login():
+    if not GOOGLE_CLIENT_ID:
+        raise HTTPException(503, "Google login no configurado")
+    from urllib.parse import urlencode
+    from fastapi.responses import RedirectResponse
+    params = {
+        "client_id": GOOGLE_CLIENT_ID,
+        "redirect_uri": f"{APP_URL}/api/auth/google/callback",
+        "response_type": "code",
+        "scope": "openid email profile",
+    }
+    return RedirectResponse("https://accounts.google.com/o/oauth2/v2/auth?" + urlencode(params))
+
+
+@app.get("/api/auth/google/callback")
+async def google_callback(code: str = "", error: str = ""):
+    from fastapi.responses import RedirectResponse
+    if error or not code:
+        return RedirectResponse(f"{APP_URL}/?auth_error=cancelled")
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            token_resp = await client.post("https://oauth2.googleapis.com/token", data={
+                "code": code,
+                "client_id": GOOGLE_CLIENT_ID,
+                "client_secret": GOOGLE_CLIENT_SECRET,
+                "redirect_uri": f"{APP_URL}/api/auth/google/callback",
+                "grant_type": "authorization_code",
+            })
+            token_data = token_resp.json()
+            access_token = token_data.get("access_token")
+            if not access_token:
+                return RedirectResponse(f"{APP_URL}/?auth_error=google_failed")
+            user_resp = await client.get(
+                "https://www.googleapis.com/oauth2/v2/userinfo",
+                headers={"Authorization": f"Bearer {access_token}"}
+            )
+            google_user = user_resp.json()
+    except Exception as e:
+        print(f"[google_oauth] error: {e}")
+        return RedirectResponse(f"{APP_URL}/?auth_error=google_failed")
+
+    email = google_user.get("email", "")
+    google_id = str(google_user.get("id", ""))
+    name = google_user.get("name") or google_user.get("given_name") or email.split("@")[0]
+
+    if not email or not google_id:
+        return RedirectResponse(f"{APP_URL}/?auth_error=google_no_email")
+
+    db = get_db()
+    try:
+        user = db.execute("SELECT * FROM users WHERE google_id=?", (google_id,)).fetchone()
+        if not user:
+            existing = db.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
+            if existing:
+                db.execute("UPDATE users SET google_id=? WHERE id=?", (google_id, dict(existing)["id"]))
+                db.commit()
+                user = db.execute("SELECT * FROM users WHERE id=?", (dict(existing)["id"],)).fetchone()
+            else:
+                username = _unique_username(db, name)
+                db.execute(
+                    "INSERT INTO users (username, email, password_hash, google_id) VALUES (?,?,?,?)",
+                    (username, email, "", google_id)
+                )
+                db.commit()
+                user = db.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
+        jwt_token = make_token(dict(user)["id"])
+    finally:
+        db.close()
+
+    return RedirectResponse(f"{APP_URL}/?gl_token={jwt_token}")
 
 
 # ── Steam integration ─────────────────────────────────

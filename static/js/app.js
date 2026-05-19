@@ -1356,3 +1356,171 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal()
 // ── Init ──────────────────────────────────────────────
 route();
 initGenrePills();
+// Start onboarding tour for first-time non-logged-in visitors
+setTimeout(() => {
+  if (!AUTH.user && !localStorage.getItem('ck_tour_done')) startTour();
+}, 1800);
+
+
+// ── Onboarding Tour ───────────────────────────────────
+const TOUR_STEPS = [
+  {
+    target: null,
+    title: '👾 Bienvenido a Checkpoint',
+    text: 'Tu diario de gaming personal. Registra lo que juegas, descubre juegos nuevos y conecta con otros jugadores.',
+  },
+  {
+    target: '#games-grid',
+    title: '🎮 Juegos populares',
+    text: 'Los juegos más jugados del momento. Haz clic en cualquiera para ver detalles, precio y añadirlo a tu lista.',
+    pos: 'top',
+  },
+  {
+    target: '#genre-pills',
+    title: '🏷️ Filtra por género',
+    text: 'Acción, RPG, Indie, Estrategia... Elige el género que más te guste o usa el buscador para encontrar cualquier juego.',
+    pos: 'bottom',
+  },
+  {
+    target: '#nav-explore',
+    title: '🗺️ Explorar géneros',
+    text: 'En Explorar verás los mejores juegos de cada categoría con valoraciones reales de la comunidad.',
+    pos: 'bottom',
+  },
+  {
+    target: '#nav-ranking',
+    title: '🏆 Ranking de la comunidad',
+    text: '¿Cuáles son los juegos mejor valorados por los usuarios de Checkpoint? Descúbrelo aquí.',
+    pos: 'bottom',
+  },
+  {
+    target: '#btn-register',
+    title: '✨ Únete gratis',
+    text: 'Crea tu cuenta para llevar tu diario de juegos, valorarlos, seguir a otros jugadores y recibir alertas de precio.',
+    pos: 'bottom',
+    cta: true,
+  },
+];
+
+let _tourStep = 0;
+let _tourEl = null;
+
+function startTour() {
+  _tourStep = 0;
+  _tourEl = document.createElement('div');
+  _tourEl.id = 'tour-root';
+  _tourEl.innerHTML = `
+    <div id="tour-spotlight"></div>
+    <div id="tour-popup">
+      <div class="tour-header">
+        <span class="tour-step-info"></span>
+        <button id="tour-skip">Saltar tour</button>
+      </div>
+      <h3 id="tour-title"></h3>
+      <p id="tour-text"></p>
+      <div class="tour-dots"></div>
+      <div class="tour-footer">
+        <button id="tour-back">← Anterior</button>
+        <button id="tour-next">Siguiente →</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(_tourEl);
+
+  document.getElementById('tour-skip').addEventListener('click', endTour);
+  document.getElementById('tour-next').addEventListener('click', _tourNext);
+  document.getElementById('tour-back').addEventListener('click', _tourPrev);
+  document.addEventListener('keydown', _tourKeyHandler);
+
+  _renderTourStep();
+}
+
+function _tourKeyHandler(e) {
+  if (e.key === 'ArrowRight' || e.key === 'Enter') _tourNext();
+  if (e.key === 'ArrowLeft') _tourPrev();
+  if (e.key === 'Escape') endTour();
+}
+
+function _tourNext() {
+  if (_tourStep < TOUR_STEPS.length - 1) {
+    _tourStep++;
+    _renderTourStep();
+  } else {
+    endTour();
+    AUTH.showModal('register');
+  }
+}
+
+function _tourPrev() {
+  if (_tourStep > 0) { _tourStep--; _renderTourStep(); }
+}
+
+function _renderTourStep() {
+  const step = TOUR_STEPS[_tourStep];
+  const isLast = _tourStep === TOUR_STEPS.length - 1;
+  const isFirst = _tourStep === 0;
+
+  document.getElementById('tour-title').textContent = step.title;
+  document.getElementById('tour-text').textContent = step.text;
+  document.querySelector('.tour-step-info').textContent = `${_tourStep + 1} / ${TOUR_STEPS.length}`;
+  document.getElementById('tour-next').textContent = isLast ? '¡Empezar! 🚀' : 'Siguiente →';
+  document.getElementById('tour-back').style.visibility = isFirst ? 'hidden' : '';
+
+  // Dots
+  document.querySelector('.tour-dots').innerHTML = TOUR_STEPS.map((_, i) =>
+    `<span class="tour-dot ${i === _tourStep ? 'active' : ''}"></span>`
+  ).join('');
+
+  const spotlight = document.getElementById('tour-spotlight');
+  const popup = document.getElementById('tour-popup');
+
+  if (!step.target) {
+    spotlight.style.cssText = 'display:none';
+    popup.className = 'tour-center';
+    return;
+  }
+
+  popup.className = '';
+  const target = document.querySelector(step.target);
+  if (!target) { _tourStep++; if (_tourStep < TOUR_STEPS.length) _renderTourStep(); return; }
+
+  // Scroll target into view, then position
+  target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  setTimeout(() => {
+    const r = target.getBoundingClientRect();
+    const pad = 10;
+    spotlight.style.cssText = `display:block;left:${r.left - pad}px;top:${r.top - pad}px;width:${r.width + pad * 2}px;height:${r.height + pad * 2}px`;
+
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const pw = Math.min(340, vw - 32);
+
+    // Vertical: prefer below, fallback above
+    let top;
+    if (step.pos === 'bottom' || r.bottom + 16 + 200 < vh) {
+      top = r.bottom + pad + 16;
+    } else {
+      top = r.top - pad - 16 - 240;
+    }
+    top = Math.max(16, Math.min(top, vh - 260));
+
+    // Horizontal: center on target, clamp to viewport
+    let left = r.left + r.width / 2 - pw / 2;
+    left = Math.max(16, Math.min(left, vw - pw - 16));
+
+    popup.style.top = `${top}px`;
+    popup.style.left = `${left}px`;
+    popup.style.width = `${pw}px`;
+  }, 380);
+}
+
+function endTour() {
+  localStorage.setItem('ck_tour_done', '1');
+  document.removeEventListener('keydown', _tourKeyHandler);
+  if (_tourEl) {
+    _tourEl.style.opacity = '0';
+    _tourEl.style.transition = 'opacity 0.3s';
+    setTimeout(() => _tourEl?.remove(), 300);
+    _tourEl = null;
+  }
+}

@@ -231,8 +231,16 @@ async function loadGames() {
     // Apply platform filter if active
     if (currentPlatform) applyPlatformFilter();
     renderPagination();
-  } catch {
-    grid.innerHTML = `<div class="no-results">${t('error.games')}</div>`;
+  } catch (err) {
+    // Server may be waking up (cold start) — retry once after 4 seconds
+    if (!loadGames._retry) {
+      loadGames._retry = true;
+      grid.innerHTML = `<div class="loading"><div class="spinner"></div><p>${t('loading.games')}</p></div>`;
+      setTimeout(() => { loadGames._retry = false; loadGames(); }, 4000);
+    } else {
+      loadGames._retry = false;
+      grid.innerHTML = `<div class="no-results">${t('error.games')}</div>`;
+    }
   }
 }
 

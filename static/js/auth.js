@@ -17,8 +17,12 @@ window.AUTH = {
       this.user = r;
       localStorage.setItem('gl_user', JSON.stringify(r));
       this.updateUI();
-    } catch {
-      this.logout(false);
+    } catch (err) {
+      // Only clear the session on explicit auth rejection (401/403).
+      // Network errors or server cold-start (5xx, TypeError) keep the cached session.
+      if (err.status === 401 || err.status === 403) {
+        this.logout(false);
+      }
     }
   },
 

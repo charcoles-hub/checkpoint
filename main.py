@@ -1,4 +1,5 @@
 import asyncio
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -10,7 +11,15 @@ from alerts import check_alerts
 
 load_dotenv()
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    asyncio.create_task(alert_loop())
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 STEAM = "https://store.steampowered.com/api"
 STEAMSPY = "https://steamspy.com/api.php"
@@ -277,11 +286,6 @@ async def alert_loop():
             print(f"[alerts] error: {e}")
         await asyncio.sleep(6 * 3600)
 
-
-@app.on_event("startup")
-async def startup():
-    init_db()
-    asyncio.create_task(alert_loop())
 
 
 # SPA fallback — serve index.html for client-side routes

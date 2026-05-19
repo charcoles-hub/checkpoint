@@ -1,7 +1,6 @@
 import asyncio
 import os
 import secrets
-import resend
 import stripe
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
@@ -26,13 +25,17 @@ def send_email(to: str, subject: str, body: str):
     if not RESEND_API_KEY:
         print(f"[email] Resend not configured. Would send to {to}: {subject}")
         return
-    resend.api_key = RESEND_API_KEY
-    resend.Emails.send({
-        "from": RESEND_FROM,
-        "to": [to],
-        "subject": subject,
-        "text": body,
-    })
+    try:
+        import resend as _resend
+        _resend.api_key = RESEND_API_KEY
+        _resend.Emails.send({
+            "from": RESEND_FROM,
+            "to": [to],
+            "subject": subject,
+            "text": body,
+        })
+    except ImportError:
+        print("[email] resend package not installed. Run: pip install resend")
 
 
 def get_real_ip(request: Request) -> str:

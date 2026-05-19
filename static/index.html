@@ -125,14 +125,23 @@
     <section class="games-section" style="padding-top:100px">
       <div class="section-header">
         <h2>Mi lista de juegos</h2>
-        <div class="list-tabs">
+        <div class="list-tabs" id="mylist-tabs">
           <button class="list-tab active" data-status="all">Todos</button>
           <button class="list-tab" data-status="played">Jugados</button>
           <button class="list-tab" data-status="playing">Jugando</button>
           <button class="list-tab" data-status="wishlist">Deseados</button>
+          <button class="list-tab" data-status="siguiendo">Siguiendo</button>
         </div>
       </div>
       <div class="games-grid" id="mylist-grid"></div>
+      <div id="following-section" style="display:none">
+        <div class="user-search-box">
+          <input type="text" id="user-search-input" class="field-input" placeholder="Buscar jugadores por nombre..." autocomplete="off" />
+          <div id="user-search-results"></div>
+        </div>
+        <div id="following-list"></div>
+        <div id="following-feed"></div>
+      </div>
       <div class="alerts-section" id="alerts-section">
         <h3 style="margin:32px 0 16px;font-size:1.1rem">Alertas de precio</h3>
         <div id="alerts-list"></div>

@@ -11,17 +11,22 @@ class _PGConn:
         import psycopg2
         import psycopg2.extras
         from urllib.parse import urlparse, unquote
-        # Parse URL manually so special chars in password (^, %) work correctly
+
         p = urlparse(url)
-        self._conn = psycopg2.connect(
-            host=p.hostname,
-            port=p.port or 5432,
-            dbname=p.path.lstrip('/'),
-            user=unquote(p.username or ''),
-            password=unquote(p.password or ''),
-            sslmode="require",
-            cursor_factory=psycopg2.extras.RealDictCursor
+
+        def esc(v: str) -> str:
+            # Escape for key=value DSN single-quoted values (% safe here)
+            return v.replace("\\", "\\\\").replace("'", "\\'")
+
+        dsn = (
+            f"host='{esc(p.hostname)}' "
+            f"port={p.port or 5432} "
+            f"dbname='{esc(p.path.lstrip('/'))}' "
+            f"user='{esc(unquote(p.username or ''))}' "
+            f"password='{esc(unquote(p.password or ''))}' "
+            f"sslmode=require"
         )
+        self._conn = psycopg2.connect(dsn, cursor_factory=psycopg2.extras.RealDictCursor)
 
     def execute(self, sql: str, params=()):
         sql = sql.replace("?", "%s")
@@ -54,6 +59,12 @@ def init_db():
 
 def _init_sqlite():
     db = get_db()
+    # Safe migrations
+    try:
+        db.execute("ALTER TABLE game_entries ADD COLUMN draft_notes TEXT")
+        db.commit()
+    except Exception:
+        pass
     db.executescript("""
         CREATE TABLE IF NOT EXISTS users (
             id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -72,6 +83,7 @@ def _init_sqlite():
             status      TEXT NOT NULL DEFAULT 'wishlist',
             rating      INTEGER CHECK(rating BETWEEN 1 AND 10),
             notes       TEXT,
+            draft_notes TEXT,
             added_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(user_id, steam_appid)
         );
@@ -88,6 +100,13 @@ def _init_sqlite():
             triggered_at  TIMESTAMP,
             UNIQUE(user_id, steam_appid)
         );
+        CREATE TABLE IF NOT EXISTS follows (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            follower_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            following_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(follower_id, following_id)
+        );
     """)
     db.commit()
     db.close()
@@ -95,6 +114,16 @@ def _init_sqlite():
 
 def _init_pg():
     db = get_db()
+    # Safe migrations for columns added after initial deploy
+    migrations = [
+        "ALTER TABLE game_entries ADD COLUMN IF NOT EXISTS draft_notes TEXT",
+    ]
+    for m in migrations:
+        try:
+            db.execute(m)
+        except Exception:
+            pass
+    db.commit()
     stmts = [
         """CREATE TABLE IF NOT EXISTS users (
             id            SERIAL PRIMARY KEY,
@@ -113,6 +142,7 @@ def _init_pg():
             status      TEXT NOT NULL DEFAULT 'wishlist',
             rating      INTEGER CHECK(rating BETWEEN 1 AND 10),
             notes       TEXT,
+            draft_notes TEXT,
             added_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(user_id, steam_appid)
         )""",
@@ -128,6 +158,13 @@ def _init_pg():
             created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             triggered_at  TIMESTAMP,
             UNIQUE(user_id, steam_appid)
+        )""",
+        """CREATE TABLE IF NOT EXISTS follows (
+            id           SERIAL PRIMARY KEY,
+            follower_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            following_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(follower_id, following_id)
         )""",
     ]
     for stmt in stmts:

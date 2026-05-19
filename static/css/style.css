@@ -523,6 +523,56 @@ body {
 }
 .toast-show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
+/* ── Social / Follow ─────────────────────────────── */
+.btn-follow {
+  padding: 6px 16px; border-radius: 20px; font-size: 0.85rem; font-weight: 600;
+  cursor: pointer; font-family: inherit; transition: all 0.2s;
+  background: var(--purple); color: white; border: none;
+  white-space: nowrap;
+}
+.btn-follow.following {
+  background: transparent; border: 1px solid var(--border); color: var(--muted2);
+}
+.btn-follow.following:hover { border-color: #ef4444; color: #ef4444; }
+
+.user-search-box { margin-bottom: 24px; max-width: 480px; }
+#user-search-results { margin-top: 8px; }
+
+.user-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 0; border-bottom: 1px solid var(--border);
+}
+.user-avatar-sm {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--purple), var(--cyan));
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 0.9rem; color: white;
+  cursor: pointer; flex-shrink: 0;
+}
+.user-row-name { font-weight: 600; cursor: pointer; }
+.user-row-name:hover { color: var(--purple); }
+
+.feed-item {
+  display: flex; gap: 14px; padding: 14px 0;
+  border-bottom: 1px solid var(--border); cursor: pointer;
+}
+.feed-item:hover { background: var(--surface2); margin: 0 -16px; padding: 14px 16px; border-radius: 8px; }
+.feed-thumb { width: 80px; height: 45px; object-fit: cover; border-radius: 6px; flex-shrink: 0; }
+.feed-info { flex: 1; min-width: 0; }
+.feed-user { margin-bottom: 4px; }
+.feed-username { font-weight: 600; color: var(--purple); cursor: pointer; font-size: 0.9rem; }
+.feed-username:hover { text-decoration: underline; }
+.feed-game { font-weight: 500; font-size: 0.95rem; }
+.feed-notes { color: var(--muted); font-size: 0.82rem; font-style: italic; margin-top: 4px; }
+
+.my-entry-box {
+  margin-top: 20px; padding: 16px;
+  background: var(--surface2); border: 1px solid var(--border); border-radius: 10px;
+}
+.my-entry-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.my-entry-notes { color: var(--muted2); font-style: italic; font-size: 0.9rem; margin-bottom: 14px; }
+.draft-section { margin-top: 12px; }
+
 .hamburger {
   display: none;
   flex-direction: column; gap: 5px; justify-content: center;

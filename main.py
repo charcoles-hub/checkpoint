@@ -155,15 +155,39 @@ def _pub(u): return {"id": u["id"], "username": u["username"], "email": u["email
 
 
 # ── Public profiles ────────────────────────────────────
-@app.get("/api/users/{username}")
-def public_profile(username: str):
+@app.get("/api/users/search")
+def search_users(q: str = "", user=Depends(current_user)):
+    if len(q) < 2:
+        return []
     db = get_db()
-    user = db.execute("SELECT id, username, created_at FROM users WHERE username=?", (username,)).fetchone()
-    if not user:
+    exclude_id = user["id"] if user else -1
+    rows = db.execute(
+        "SELECT id, username FROM users WHERE username LIKE ? AND id != ? LIMIT 10",
+        (f"%{q}%", exclude_id)
+    ).fetchall()
+    results = []
+    for row in [dict(r) for r in rows]:
+        count = db.execute("SELECT COUNT(*) as c FROM game_entries WHERE user_id=?", (row["id"],)).fetchone()
+        row["total_games"] = count["c"] if count else 0
+        if user:
+            f = db.execute("SELECT COUNT(*) as c FROM follows WHERE follower_id=? AND following_id=?", (user["id"], row["id"])).fetchone()
+            row["is_following"] = (f["c"] > 0) if f else False
+        else:
+            row["is_following"] = False
+        results.append(row)
+    db.close()
+    return results
+
+
+@app.get("/api/users/{username}")
+def public_profile(username: str, user=Depends(current_user)):
+    db = get_db()
+    target = db.execute("SELECT id, username, created_at FROM users WHERE username=?", (username,)).fetchone()
+    if not target:
         raise HTTPException(404, "Usuario no encontrado")
-    user = dict(user)
+    target = dict(target)
     entries = db.execute(
-        "SELECT * FROM game_entries WHERE user_id=? ORDER BY added_at DESC", (user["id"],)
+        "SELECT * FROM game_entries WHERE user_id=? ORDER BY added_at DESC", (target["id"],)
     ).fetchall()
     entries = [dict(e) for e in entries]
     played = [e for e in entries if e["status"] == "played"]
@@ -175,8 +199,71 @@ def public_profile(username: str):
         "wishlist": sum(1 for e in entries if e["status"] == "wishlist"),
         "avg_rating": round(sum(e["rating"] for e in rated) / len(rated), 1) if rated else None,
     }
+    followers_count = db.execute("SELECT COUNT(*) as c FROM follows WHERE following_id=?", (target["id"],)).fetchone()["c"]
+    following_count = db.execute("SELECT COUNT(*) as c FROM follows WHERE follower_id=?", (target["id"],)).fetchone()["c"]
+    is_following = False
+    is_own = user is not None and user["id"] == target["id"]
+    if user and not is_own:
+        f = db.execute("SELECT COUNT(*) as c FROM follows WHERE follower_id=? AND following_id=?", (user["id"], target["id"])).fetchone()
+        is_following = (f["c"] > 0) if f else False
     db.close()
-    return {"user": user, "entries": entries, "stats": stats}
+    return {
+        "user": {**target, "followers": followers_count, "following": following_count},
+        "entries": entries, "stats": stats,
+        "is_following": is_following, "is_own": is_own,
+    }
+
+
+# ── Follow system ─────────────────────────────────────
+@app.post("/api/follow/{username}")
+def follow_user(username: str, user=Depends(require_auth)):
+    db = get_db()
+    target = db.execute("SELECT id FROM users WHERE username=?", (username,)).fetchone()
+    if not target:
+        raise HTTPException(404, "Usuario no encontrado")
+    if target["id"] == user["id"]:
+        raise HTTPException(400, "No puedes seguirte a ti mismo")
+    db.execute(
+        "INSERT INTO follows (follower_id, following_id) VALUES (?,?) ON CONFLICT(follower_id, following_id) DO NOTHING",
+        (user["id"], target["id"])
+    )
+    db.commit(); db.close()
+    return {"ok": True}
+
+
+@app.delete("/api/follow/{username}")
+def unfollow_user(username: str, user=Depends(require_auth)):
+    db = get_db()
+    target = db.execute("SELECT id FROM users WHERE username=?", (username,)).fetchone()
+    if not target:
+        raise HTTPException(404, "Usuario no encontrado")
+    db.execute("DELETE FROM follows WHERE follower_id=? AND following_id=?", (user["id"], target["id"]))
+    db.commit(); db.close()
+    return {"ok": True}
+
+
+@app.get("/api/following")
+def get_following(user=Depends(require_auth)):
+    db = get_db()
+    following = db.execute("""
+        SELECT u.id, u.username FROM follows f
+        JOIN users u ON u.id = f.following_id
+        WHERE f.follower_id=? ORDER BY f.created_at DESC
+    """, (user["id"],)).fetchall()
+    following = [dict(u) for u in following]
+    feed = []
+    if following:
+        ids = [u["id"] for u in following]
+        placeholders = ",".join("?" * len(ids))
+        rows = db.execute(f"""
+            SELECT ge.*, u.username as player
+            FROM game_entries ge JOIN users u ON u.id = ge.user_id
+            WHERE ge.user_id IN ({placeholders})
+            ORDER BY ge.added_at DESC LIMIT 30
+        """, ids).fetchall()
+        feed = [dict(r) for r in rows]
+    db.close()
+    return {"following": following, "feed": feed}
 
 
 # ── Community ranking ──────────────────────────────────
@@ -205,6 +292,7 @@ class EntryIn(BaseModel):
     status: str = "wishlist"
     rating: int | None = None
     notes: str | None = None
+    draft_notes: str | None = None
 
 
 @app.get("/api/list")
@@ -215,15 +303,24 @@ def get_list(user=Depends(require_auth)):
     return [dict(r) for r in rows]
 
 
+@app.get("/api/list/{appid}")
+def get_entry(appid: int, user=Depends(require_auth)):
+    db = get_db()
+    row = db.execute("SELECT * FROM game_entries WHERE user_id=? AND steam_appid=?", (user["id"], appid)).fetchone()
+    db.close()
+    return dict(row) if row else None
+
+
 @app.post("/api/list")
 def add_to_list(body: EntryIn, user=Depends(require_auth)):
     db = get_db()
     db.execute("""
-        INSERT INTO game_entries (user_id, steam_appid, game_name, game_image, status, rating, notes)
-        VALUES (?,?,?,?,?,?,?)
+        INSERT INTO game_entries (user_id, steam_appid, game_name, game_image, status, rating, notes, draft_notes)
+        VALUES (?,?,?,?,?,?,?,?)
         ON CONFLICT(user_id, steam_appid) DO UPDATE SET
-            status=excluded.status, rating=excluded.rating, notes=excluded.notes
-    """, (user["id"], body.steam_appid, body.game_name, body.game_image, body.status, body.rating, body.notes))
+            status=excluded.status, rating=excluded.rating, notes=excluded.notes,
+            draft_notes=COALESCE(excluded.draft_notes, game_entries.draft_notes)
+    """, (user["id"], body.steam_appid, body.game_name, body.game_image, body.status, body.rating, body.notes, body.draft_notes))
     db.commit(); db.close()
     return {"ok": True}
 

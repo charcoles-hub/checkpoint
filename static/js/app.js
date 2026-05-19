@@ -414,7 +414,10 @@ async function openModal(gameId) {
   modalOverlay.classList.add('open');
   document.body.style.overflow = 'hidden';
   try {
-    const g = await AUTH.apiFetch(`/api/games/${gameId}`);
+    const [g, myEntry] = await Promise.all([
+      AUTH.apiFetch(`/api/games/${gameId}`),
+      AUTH.user ? AUTH.apiFetch(`/api/list/${gameId}`).catch(() => null) : Promise.resolve(null),
+    ]);
     const genres = (g.genres || []).map(x => `<span class="genre-tag">${x}</span>`).join('');
     const plats = (g.platforms || []).slice(0, 5).map(p => `<span class="platform-tag">${p}</span>`).join('');
     const desc = (g.description || 'Sin descripción.').slice(0, 500) + (g.description?.length > 500 ? '…' : '');
@@ -455,6 +458,24 @@ async function openModal(gameId) {
           <button class="btn-ghost" id="btn-skip-alert">Sin alerta</button>
         </div>
       </div>
+      ${myEntry ? `
+      <div class="my-entry-box">
+        <div class="my-entry-header">
+          <span class="status-badge status-${myEntry.status}">${{played:'Jugado',playing:'Jugando',wishlist:'Deseado'}[myEntry.status]}</span>
+          ${myEntry.rating ? `<span class="game-rating">${myEntry.rating}/10</span>` : ''}
+        </div>
+        ${myEntry.notes ? `<p class="my-entry-notes">"${myEntry.notes}"</p>` : ''}
+        <div class="draft-section">
+          <label style="font-size:0.82rem;color:var(--muted);display:block;margin-bottom:6px">Mis apuntes privados</label>
+          <textarea id="draft-input" class="field-input" rows="3" placeholder="Ideas, impresiones, pendientes..." style="resize:vertical;margin-bottom:8px">${myEntry.draft_notes || ''}</textarea>
+          <button class="btn-ghost" id="btn-save-draft" style="padding:6px 14px;font-size:0.85rem">Guardar apuntes</button>
+        </div>
+      </div>` : AUTH.user ? `
+      <div class="draft-section" style="margin-top:16px">
+        <label style="font-size:0.82rem;color:var(--muted);display:block;margin-bottom:6px">Mis apuntes privados (sin valoración oficial)</label>
+        <textarea id="draft-input" class="field-input" rows="3" placeholder="Ideas, impresiones, pendientes..." style="resize:vertical;margin-bottom:8px"></textarea>
+        <button class="btn-ghost" id="btn-save-draft" style="padding:6px 14px;font-size:0.85rem">Guardar apuntes</button>
+      </div>` : ''}
     `;
 
     buildStars('stars-container', 0);
@@ -502,6 +523,16 @@ async function openModal(gameId) {
       document.getElementById('alert-form').style.display = 'none';
       showToast('♡ Añadido a lista de deseos');
     });
+    document.getElementById('btn-save-draft')?.addEventListener('click', async () => {
+      if (!AUTH.user) { AUTH.showModal('login'); return; }
+      const draft = document.getElementById('draft-input').value.trim() || null;
+      const status = myEntry?.status || 'wishlist';
+      await AUTH.apiFetch('/api/list', { method: 'POST', body: JSON.stringify({
+        steam_appid: g.id, game_name: g.name, game_image: g.image,
+        status, rating: myEntry?.rating || null, notes: myEntry?.notes || null, draft_notes: draft
+      })});
+      showToast('📝 Apuntes guardados');
+    });
   } catch { modalContent.innerHTML = '<div class="no-results">Error al cargar el juego.</div>'; }
 }
 
@@ -517,22 +548,34 @@ function closeModal() { modalOverlay.classList.remove('open'); document.body.sty
 async function loadMyList() {
   if (!AUTH.user) { showView('home'); AUTH.showModal('login'); return; }
   const listGrid = document.getElementById('mylist-grid');
+  const followingSection = document.getElementById('following-section');
+  const alertsSection = document.getElementById('alerts-section');
   listGrid.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
   let activeStatus = 'all';
   const [entries, alerts] = await Promise.all([AUTH.apiFetch('/api/list'), AUTH.apiFetch('/api/alerts')]);
 
   function renderList() {
+    if (activeStatus === 'siguiendo') {
+      listGrid.style.display = 'none';
+      followingSection.style.display = '';
+      alertsSection.style.display = 'none';
+      loadFollowingSection();
+      return;
+    }
+    listGrid.style.display = '';
+    followingSection.style.display = 'none';
+    alertsSection.style.display = '';
     const filtered = activeStatus === 'all' ? entries : entries.filter(e => e.status === activeStatus);
     listGrid.innerHTML = '';
     if (!filtered.length) { listGrid.innerHTML = '<div class="no-results">No tienes juegos en esta categoría.</div>'; return; }
     filtered.forEach(e => listGrid.appendChild(renderCard(e, () => openModal(e.steam_appid))));
   }
 
-  document.querySelectorAll('.list-tab').forEach(tab => {
+  document.querySelectorAll('#mylist-tabs .list-tab').forEach(tab => {
     const fresh = tab.cloneNode(true);
     tab.parentNode.replaceChild(fresh, tab);
     fresh.addEventListener('click', () => {
-      document.querySelectorAll('.list-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('#mylist-tabs .list-tab').forEach(t => t.classList.remove('active'));
       fresh.classList.add('active'); activeStatus = fresh.dataset.status; renderList();
     });
   });
@@ -579,6 +622,143 @@ function renderAlerts(alerts) {
   });
 }
 
+// ── Following section ─────────────────────────────────
+let followingLoaded = false;
+
+async function loadFollowingSection() {
+  if (followingLoaded) return;
+  followingLoaded = true;
+
+  const listEl = document.getElementById('following-list');
+  const feedEl = document.getElementById('following-feed');
+  listEl.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+
+  const { following, feed } = await AUTH.apiFetch('/api/following');
+
+  // Render followed users
+  if (!following.length) {
+    listEl.innerHTML = '<p style="color:var(--muted);margin-bottom:24px">Aún no sigues a nadie. Búscalos arriba.</p>';
+  } else {
+    listEl.innerHTML = '<h4 style="margin-bottom:12px;color:var(--muted2);font-size:0.9rem;text-transform:uppercase;letter-spacing:.05em">Siguiendo</h4>';
+    following.forEach(u => {
+      const row = document.createElement('div');
+      row.className = 'user-row';
+      row.innerHTML = `
+        <div class="user-avatar-sm">${u.username[0].toUpperCase()}</div>
+        <span class="user-row-name">${u.username}</span>
+        <button class="btn-follow following" data-username="${u.username}">Siguiendo</button>
+      `;
+      row.querySelector('.user-avatar-sm').addEventListener('click', () => {
+        history.pushState({}, '', `/u/${u.username}`); showView('profile'); loadProfile(u.username);
+      });
+      row.querySelector('span').addEventListener('click', () => {
+        history.pushState({}, '', `/u/${u.username}`); showView('profile'); loadProfile(u.username);
+      });
+      row.querySelector('.btn-follow').addEventListener('click', async (e) => {
+        await AUTH.apiFetch(`/api/follow/${u.username}`, { method: 'DELETE' });
+        row.remove();
+        showToast(`Dejaste de seguir a ${u.username}`);
+        followingLoaded = false;
+      });
+      listEl.appendChild(row);
+    });
+  }
+
+  // Render activity feed
+  if (!feed.length) {
+    feedEl.innerHTML = '<p style="color:var(--muted)">La actividad de las personas que sigues aparecerá aquí.</p>';
+  } else {
+    feedEl.innerHTML = '<h4 style="margin:24px 0 12px;color:var(--muted2);font-size:0.9rem;text-transform:uppercase;letter-spacing:.05em">Actividad reciente</h4>';
+    const statusLabel = { played: 'Jugado', playing: 'Jugando', wishlist: 'Deseado' };
+    const statusColor = { played: 'var(--purple)', playing: 'var(--cyan)', wishlist: 'var(--muted2)' };
+    feed.forEach(e => {
+      const item = document.createElement('div');
+      item.className = 'feed-item';
+      item.innerHTML = `
+        <img src="${e.game_image || ''}" class="feed-thumb" onerror="this.style.display='none'" />
+        <div class="feed-info">
+          <div class="feed-user">
+            <span class="feed-username" data-u="${e.player}">${e.player}</span>
+            <span style="color:var(--muted);font-size:0.82rem"> · ${timeAgo(e.added_at)}</span>
+          </div>
+          <div class="feed-game">${e.game_name}</div>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:4px">
+            <span style="font-size:0.8rem;color:${statusColor[e.status]}">${statusLabel[e.status]}</span>
+            ${e.rating ? `<span class="game-rating" style="font-size:0.8rem">${e.rating}/10</span>` : ''}
+          </div>
+          ${e.notes ? `<div class="feed-notes">"${e.notes.slice(0, 80)}${e.notes.length > 80 ? '…' : ''}"</div>` : ''}
+        </div>
+      `;
+      item.querySelector('.feed-username').addEventListener('click', () => {
+        history.pushState({}, '', `/u/${e.player}`); showView('profile'); loadProfile(e.player);
+      });
+      item.addEventListener('click', (ev) => {
+        if (!ev.target.classList.contains('feed-username')) openModal(e.steam_appid);
+      });
+      feedEl.appendChild(item);
+    });
+  }
+
+  // User search
+  const searchInput = document.getElementById('user-search-input');
+  const resultsEl = document.getElementById('user-search-results');
+  let searchTO = null;
+  searchInput.addEventListener('input', () => {
+    clearTimeout(searchTO);
+    const q = searchInput.value.trim();
+    if (!q) { resultsEl.innerHTML = ''; return; }
+    searchTO = setTimeout(async () => {
+      const users = await AUTH.apiFetch(`/api/users/search?q=${encodeURIComponent(q)}`);
+      if (!users.length) { resultsEl.innerHTML = '<p style="color:var(--muted);padding:8px 0">Sin resultados.</p>'; return; }
+      resultsEl.innerHTML = '';
+      users.forEach(u => {
+        const row = document.createElement('div');
+        row.className = 'user-row';
+        row.innerHTML = `
+          <div class="user-avatar-sm">${u.username[0].toUpperCase()}</div>
+          <div style="flex:1">
+            <span class="user-row-name">${u.username}</span>
+            <span style="color:var(--muted);font-size:0.8rem;margin-left:8px">${u.total_games} juegos</span>
+          </div>
+          <button class="btn-follow ${u.is_following ? 'following' : ''}" data-username="${u.username}">
+            ${u.is_following ? 'Siguiendo' : 'Seguir'}
+          </button>
+        `;
+        const btn = row.querySelector('.btn-follow');
+        btn.addEventListener('click', async () => {
+          if (btn.classList.contains('following')) {
+            await AUTH.apiFetch(`/api/follow/${u.username}`, { method: 'DELETE' });
+            btn.classList.remove('following'); btn.textContent = 'Seguir';
+            showToast(`Dejaste de seguir a ${u.username}`);
+          } else {
+            await AUTH.apiFetch(`/api/follow/${u.username}`, { method: 'POST' });
+            btn.classList.add('following'); btn.textContent = 'Siguiendo';
+            showToast(`Siguiendo a ${u.username}`);
+          }
+          followingLoaded = false;
+        });
+        row.querySelector('.user-avatar-sm').addEventListener('click', () => {
+          history.pushState({}, '', `/u/${u.username}`); showView('profile'); loadProfile(u.username);
+        });
+        resultsEl.appendChild(row);
+      });
+    }, 350);
+  });
+}
+
+function timeAgo(dateStr) {
+  if (!dateStr) return '';
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return 'ahora';
+  if (m < 60) return `hace ${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `hace ${h}h`;
+  const d = Math.floor(h / 24);
+  if (d < 30) return `hace ${d}d`;
+  return new Date(dateStr).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+}
+
 // ── Ranking ──────────────────────────────────────────
 async function loadRanking() {
   const el = document.getElementById('ranking-list');
@@ -611,12 +791,24 @@ async function loadProfile(username) {
   const profileGrid = document.getElementById('profile-grid');
   header.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
   try {
-    const { user, entries, stats } = await AUTH.apiFetch(`/api/users/${username}`);
+    const { user, entries, stats, is_following, is_own } = await AUTH.apiFetch(`/api/users/${username}`);
     const joined = new Date(user.created_at).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
     header.innerHTML = `
       <div class="profile-hero">
         <div class="profile-avatar">${user.username[0].toUpperCase()}</div>
-        <div><h2 class="profile-name">${user.username}</h2><p style="color:var(--muted);font-size:0.9rem">Miembro desde ${joined}</p></div>
+        <div style="flex:1">
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <h2 class="profile-name">${user.username}</h2>
+            ${!is_own && AUTH.user ? `<button class="btn-follow ${is_following ? 'following' : ''}" id="btn-follow-profile">
+              ${is_following ? 'Siguiendo' : 'Seguir'}
+            </button>` : ''}
+          </div>
+          <p style="color:var(--muted);font-size:0.9rem;margin-top:4px">Miembro desde ${joined}</p>
+          <div style="display:flex;gap:16px;margin-top:8px">
+            <span style="color:var(--muted2);font-size:0.85rem"><strong>${user.followers}</strong> seguidores</span>
+            <span style="color:var(--muted2);font-size:0.85rem"><strong>${user.following}</strong> siguiendo</span>
+          </div>
+        </div>
       </div>
       <div class="profile-stats">
         <div class="stat-box"><div class="stat-num">${stats.played}</div><div class="stat-label">Jugados</div></div>
@@ -625,6 +817,23 @@ async function loadProfile(username) {
         ${stats.avg_rating ? `<div class="stat-box"><div class="stat-num">${stats.avg_rating}</div><div class="stat-label">Nota media</div></div>` : ''}
       </div>
     `;
+
+    const followBtn = document.getElementById('btn-follow-profile');
+    if (followBtn) {
+      followBtn.addEventListener('click', async () => {
+        if (followBtn.classList.contains('following')) {
+          await AUTH.apiFetch(`/api/follow/${username}`, { method: 'DELETE' });
+          followBtn.classList.remove('following'); followBtn.textContent = 'Seguir';
+          showToast(`Dejaste de seguir a ${username}`);
+        } else {
+          await AUTH.apiFetch(`/api/follow/${username}`, { method: 'POST' });
+          followBtn.classList.add('following'); followBtn.textContent = 'Siguiendo';
+          showToast(`Siguiendo a ${username}`);
+        }
+        followingLoaded = false;
+      });
+    }
+
     let activeStatus = 'all';
     function renderProfileList() {
       const filtered = activeStatus === 'all' ? entries : entries.filter(e => e.status === activeStatus);

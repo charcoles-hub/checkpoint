@@ -225,6 +225,11 @@ const STRINGS = {
     'community.title': 'Comunidad',
     'community.subtitle': 'Descubre otros jugadores y sigue su actividad',
     'modal.btn_remove': '🗑 Eliminar de mi lista',
+    'modal.review_label': 'Tu reseña pública',
+    'modal.review_placeholder': 'Escribe tu reseña... (se mostrará a todos los usuarios)',
+    'modal.btn_review': 'Guardar reseña',
+    'modal.community_reviews': 'Reseñas de la comunidad',
+    'toast.review_saved': '✍️ Reseña guardada',
 
     'time.now': 'ahora',
     'time.minutes': 'hace {n}m',
@@ -457,6 +462,11 @@ const STRINGS = {
     'community.title': 'Community',
     'community.subtitle': 'Discover other players and follow their activity',
     'modal.btn_remove': '🗑 Remove from list',
+    'modal.review_label': 'Your public review',
+    'modal.review_placeholder': 'Write your review... (visible to all users)',
+    'modal.btn_review': 'Save review',
+    'modal.community_reviews': 'Community reviews',
+    'toast.review_saved': '✍️ Review saved',
 
     'time.now': 'just now',
     'time.minutes': '{n}m ago',

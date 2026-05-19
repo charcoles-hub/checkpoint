@@ -201,6 +201,7 @@ function renderCard(game, onClick, onDelete) {
       </div>
       ${platforms.length ? `<div class="game-platforms">${platforms.map(p => `<span class="platform-tag">${p}</span>`).join('')}</div>` : ''}
       ${game.notes ? `<div class="game-notes">"${escHtml(game.notes.slice(0, 60))}${game.notes.length > 60 ? '…' : ''}"</div>` : ''}
+      ${game.review ? `<div class="game-notes game-review-snippet">✍️ ${escHtml(game.review.slice(0, 80))}${game.review.length > 80 ? '…' : ''}</div>` : ''}
     </div>
   `;
   if (onDelete) {
@@ -539,12 +540,22 @@ async function openModal(gameId) {
           <textarea id="draft-input" class="field-input" rows="3" placeholder="${t('modal.draft_placeholder')}" style="resize:vertical;margin-bottom:8px">${escHtml(myEntry.draft_notes || '')}</textarea>
           <button class="btn-ghost" id="btn-save-draft" style="padding:6px 14px;font-size:0.85rem">${t('modal.btn_draft')}</button>
         </div>
+        ${(myEntry.status === 'played' || myEntry.status === 'playing') ? `
+        <div class="review-section">
+          <label style="font-size:0.82rem;color:var(--muted);display:block;margin-bottom:6px">${t('modal.review_label')}</label>
+          <textarea id="review-input" class="field-input" rows="4" placeholder="${t('modal.review_placeholder')}" style="resize:vertical;margin-bottom:8px" maxlength="2000">${escHtml(myEntry.review || '')}</textarea>
+          <div style="display:flex;align-items:center;gap:10px">
+            <button class="btn-ghost" id="btn-save-review" style="padding:6px 14px;font-size:0.85rem">${t('modal.btn_review')}</button>
+            <span id="review-chars" style="font-size:0.75rem;color:var(--muted)">${(myEntry.review || '').length}/2000</span>
+          </div>
+        </div>` : ''}
       </div>` : AUTH.user ? `
       <div class="draft-section" style="margin-top:16px">
         <label style="font-size:0.82rem;color:var(--muted);display:block;margin-bottom:6px">${t('modal.draft_label_new')}</label>
         <textarea id="draft-input" class="field-input" rows="3" placeholder="${t('modal.draft_placeholder')}" style="resize:vertical;margin-bottom:8px"></textarea>
         <button class="btn-ghost" id="btn-save-draft" style="padding:6px 14px;font-size:0.85rem">${t('modal.btn_draft')}</button>
       </div>` : ''}
+      <div id="modal-reviews"></div>
     `;
 
     buildStars('stars-container', 0);
@@ -620,6 +631,36 @@ async function openModal(gameId) {
       })});
       showToast(t('toast.draft'));
     });
+    document.getElementById('review-input')?.addEventListener('input', () => {
+      const len = document.getElementById('review-input').value.length;
+      document.getElementById('review-chars').textContent = `${len}/2000`;
+    });
+    document.getElementById('btn-save-review')?.addEventListener('click', async () => {
+      const review = document.getElementById('review-input').value.trim();
+      await AUTH.apiFetch(`/api/list/${g.id}/review`, { method: 'PATCH', body: JSON.stringify({ review }) });
+      showToast(t('toast.review_saved'));
+    });
+
+    // Community reviews (public)
+    fetch(`/api/games/${gameId}/reviews`)
+      .then(r => r.ok ? r.json() : [])
+      .then(reviews => {
+        const el = document.getElementById('modal-reviews');
+        if (!el || !reviews.length) return;
+        el.innerHTML = `
+          <h4 class="modal-section-title">${t('modal.community_reviews')}</h4>
+          ${reviews.map(r => `
+            <div class="community-review-item">
+              <div class="review-meta">
+                <span class="review-username">${escHtml(r.username)}</span>
+                ${r.rating ? `<span class="game-rating" style="font-size:0.8rem;padding:2px 8px">${r.rating}/10</span>` : ''}
+              </div>
+              <p class="review-text">${escHtml(r.review)}</p>
+            </div>
+          `).join('')}
+        `;
+      })
+      .catch(() => {});
   } catch {
     modalContent.innerHTML = `
       <div class="no-results" style="padding:40px 0">

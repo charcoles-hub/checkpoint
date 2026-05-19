@@ -69,6 +69,7 @@ def _init_sqlite():
         ("users", "steam_id", "TEXT"),
         ("users", "bio", "TEXT"),
         ("users", "google_id", "TEXT"),
+        ("game_entries", "review", "TEXT"),
     ]:
         try:
             db.execute(f"ALTER TABLE {table} ADD COLUMN {col} {definition}")
@@ -100,6 +101,7 @@ def _init_sqlite():
             notes       TEXT,
             draft_notes TEXT,
             playtime    INTEGER,
+            review      TEXT,
             added_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(user_id, steam_appid)
         );
@@ -147,6 +149,7 @@ def _init_pg():
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS steam_id TEXT",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id TEXT",
+        "ALTER TABLE game_entries ADD COLUMN IF NOT EXISTS review TEXT",
     ]
     for m in migrations:
         try:
@@ -179,6 +182,7 @@ def _init_pg():
             notes       TEXT,
             draft_notes TEXT,
             playtime    INTEGER,
+            review      TEXT,
             added_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(user_id, steam_appid)
         )""",

@@ -466,6 +466,7 @@ class EntryIn(BaseModel):
     rating: int | None = None
     notes: str | None = None
     draft_notes: str | None = None
+    review: str | None = None
 
 
 @app.get("/api/list")
@@ -488,14 +489,38 @@ def get_entry(appid: int, user=Depends(require_auth)):
 def add_to_list(body: EntryIn, user=Depends(require_auth)):
     db = get_db()
     db.execute("""
-        INSERT INTO game_entries (user_id, steam_appid, game_name, game_image, status, rating, notes, draft_notes)
-        VALUES (?,?,?,?,?,?,?,?)
+        INSERT INTO game_entries (user_id, steam_appid, game_name, game_image, status, rating, notes, draft_notes, review)
+        VALUES (?,?,?,?,?,?,?,?,?)
         ON CONFLICT(user_id, steam_appid) DO UPDATE SET
             status=excluded.status, rating=excluded.rating, notes=excluded.notes,
-            draft_notes=COALESCE(excluded.draft_notes, game_entries.draft_notes)
-    """, (user["id"], body.steam_appid, body.game_name, body.game_image, body.status, body.rating, body.notes, body.draft_notes))
+            draft_notes=COALESCE(excluded.draft_notes, game_entries.draft_notes),
+            review=COALESCE(excluded.review, game_entries.review)
+    """, (user["id"], body.steam_appid, body.game_name, body.game_image, body.status, body.rating, body.notes, body.draft_notes, body.review))
     db.commit(); db.close()
     return {"ok": True}
+
+
+@app.patch("/api/list/{appid}/review")
+@limiter.limit("30/minute")
+def save_review(request: Request, appid: int, body: dict, user=Depends(require_auth)):
+    review = (body.get("review") or "").strip()[:2000] or None
+    db = get_db()
+    db.execute("UPDATE game_entries SET review=? WHERE user_id=? AND steam_appid=?", (review, user["id"], appid))
+    db.commit(); db.close()
+    return {"ok": True}
+
+
+@app.get("/api/games/{appid}/reviews")
+def get_game_reviews(appid: int):
+    db = get_db()
+    rows = db.execute("""
+        SELECT ge.review, ge.rating, ge.added_at, u.username
+        FROM game_entries ge JOIN users u ON ge.user_id = u.id
+        WHERE ge.steam_appid=? AND ge.review IS NOT NULL AND ge.review != ''
+        ORDER BY ge.added_at DESC LIMIT 20
+    """, (appid,)).fetchall()
+    db.close()
+    return [dict(r) for r in rows]
 
 
 @app.delete("/api/list/{appid}")

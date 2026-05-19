@@ -1705,12 +1705,16 @@ modalOverlay.addEventListener('click', e => { if (e.target === modalOverlay) clo
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 
 // ── Init ──────────────────────────────────────────────
-route();
-initGenrePills();
-// Start onboarding tour for first-time non-logged-in visitors
-setTimeout(() => {
-  if (!AUTH.user && !localStorage.getItem('ck_tour_done')) startTour();
-}, 1800);
+// DOMContentLoaded fires after all scripts run. auth.js registers its listener
+// first, so AUTH.init() runs before route() — ensuring AUTH.user is restored
+// from localStorage before authenticated views are loaded.
+document.addEventListener('DOMContentLoaded', () => {
+  route();
+  initGenrePills();
+  setTimeout(() => {
+    if (!AUTH.user && !localStorage.getItem('ck_tour_done')) startTour();
+  }, 1800);
+});
 
 
 // ── Onboarding Tour ───────────────────────────────────

@@ -513,11 +513,19 @@ async function openModal(gameId) {
     document.getElementById('btn-set-alert')?.addEventListener('click', async () => {
       const price = parseFloat(document.getElementById('alert-price-input').value);
       if (!price || price <= 0) { alert('Introduce un precio válido'); return; }
-      await AUTH.apiFetch('/api/alerts', { method: 'POST', body: JSON.stringify({
-        steam_appid: g.id, game_name: g.name, game_image: g.image, target_price: price
-      })});
-      document.getElementById('alert-form').style.display = 'none';
-      showToast(`🔔 Alerta activada a ${price.toFixed(2)}€`);
+      try {
+        await AUTH.apiFetch('/api/alerts', { method: 'POST', body: JSON.stringify({
+          steam_appid: g.id, game_name: g.name, game_image: g.image, target_price: price
+        })});
+        document.getElementById('alert-form').style.display = 'none';
+        showToast(`🔔 Alerta activada a ${price.toFixed(2)}€`);
+      } catch (e) {
+        if (e.status === 403) {
+          document.getElementById('alert-form').style.display = 'none';
+          showToast('Límite de alertas gratuitas alcanzado');
+          setTimeout(() => showPremiumModal(), 500);
+        }
+      }
     });
     document.getElementById('btn-skip-alert')?.addEventListener('click', () => {
       document.getElementById('alert-form').style.display = 'none';
@@ -798,7 +806,7 @@ async function loadProfile(username) {
         <div class="profile-avatar">${user.username[0].toUpperCase()}</div>
         <div style="flex:1">
           <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-            <h2 class="profile-name">${user.username}</h2>
+            <h2 class="profile-name">${user.username}${user.is_premium ? ' <span class="premium-badge">⭐</span>' : ''}</h2>
             ${!is_own && AUTH.user ? `<button class="btn-follow ${is_following ? 'following' : ''}" id="btn-follow-profile">
               ${is_following ? 'Siguiendo' : 'Seguir'}
             </button>` : ''}
@@ -852,6 +860,52 @@ async function loadProfile(username) {
     renderProfileList();
   } catch { header.innerHTML = '<div class="no-results">Usuario no encontrado.</div>'; }
 }
+
+// ── Premium ───────────────────────────────────────────
+const premiumOverlay = document.getElementById('premium-overlay');
+
+function showPremiumModal() { premiumOverlay.classList.add('open'); }
+function closePremiumModal() { premiumOverlay.classList.remove('open'); }
+
+document.getElementById('premium-close').addEventListener('click', closePremiumModal);
+premiumOverlay.addEventListener('click', e => { if (e.target === premiumOverlay) closePremiumModal(); });
+
+document.getElementById('btn-premium-menu').addEventListener('click', () => {
+  document.getElementById('user-dropdown').classList.remove('open');
+  if (AUTH.user?.is_premium) {
+    // Open billing portal to manage subscription
+    AUTH.apiFetch('/api/billing/portal', { method: 'POST' })
+      .then(r => { window.location.href = r.url; })
+      .catch(() => showToast('Error al abrir el portal'));
+  } else {
+    showPremiumModal();
+  }
+});
+
+document.getElementById('btn-go-premium').addEventListener('click', async () => {
+  if (!AUTH.user) { closePremiumModal(); AUTH.showModal('login'); return; }
+  const btn = document.getElementById('btn-go-premium');
+  btn.textContent = 'Redirigiendo...'; btn.disabled = true;
+  try {
+    const { url } = await AUTH.apiFetch('/api/billing/checkout', { method: 'POST' });
+    window.location.href = url;
+  } catch (e) {
+    showToast('Error: ' + (e.message || 'Inténtalo de nuevo'));
+    btn.textContent = 'Hazte Premium'; btn.disabled = false;
+  }
+});
+
+// Handle return from Stripe
+(function handleStripeReturn() {
+  const params = new URLSearchParams(location.search);
+  if (params.get('premium') === 'success') {
+    history.replaceState({}, '', '/');
+    setTimeout(() => showToast('⭐ ¡Ya eres Premium! Gracias por tu apoyo'), 500);
+    AUTH.verify();
+  } else if (params.get('premium') === 'cancel') {
+    history.replaceState({}, '', '/');
+  }
+})();
 
 // ── Toast ─────────────────────────────────────────────
 function showToast(msg) {

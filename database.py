@@ -60,19 +60,28 @@ def init_db():
 def _init_sqlite():
     db = get_db()
     # Safe migrations
-    try:
-        db.execute("ALTER TABLE game_entries ADD COLUMN draft_notes TEXT")
-        db.commit()
-    except Exception:
-        pass
+    for col, definition in [
+        ("draft_notes", "TEXT"),
+        ("is_premium", "INTEGER NOT NULL DEFAULT 0"),
+        ("stripe_customer_id", "TEXT"),
+        ("stripe_subscription_id", "TEXT"),
+    ]:
+        try:
+            db.execute(f"ALTER TABLE {'game_entries' if col == 'draft_notes' else 'users'} ADD COLUMN {col} {definition}")
+            db.commit()
+        except Exception:
+            pass
     db.executescript("""
         CREATE TABLE IF NOT EXISTS users (
-            id            INTEGER PRIMARY KEY AUTOINCREMENT,
-            username      TEXT UNIQUE NOT NULL,
-            email         TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
-            notify_ntfy   TEXT,
-            created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+            username               TEXT UNIQUE NOT NULL,
+            email                  TEXT UNIQUE NOT NULL,
+            password_hash          TEXT NOT NULL,
+            notify_ntfy            TEXT,
+            is_premium             INTEGER NOT NULL DEFAULT 0,
+            stripe_customer_id     TEXT,
+            stripe_subscription_id TEXT,
+            created_at             TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
         CREATE TABLE IF NOT EXISTS game_entries (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -117,6 +126,9 @@ def _init_pg():
     # Safe migrations for columns added after initial deploy
     migrations = [
         "ALTER TABLE game_entries ADD COLUMN IF NOT EXISTS draft_notes TEXT",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_premium INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_subscription_id TEXT",
     ]
     for m in migrations:
         try:
@@ -126,12 +138,15 @@ def _init_pg():
     db.commit()
     stmts = [
         """CREATE TABLE IF NOT EXISTS users (
-            id            SERIAL PRIMARY KEY,
-            username      TEXT UNIQUE NOT NULL,
-            email         TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
-            notify_ntfy   TEXT,
-            created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            id                     SERIAL PRIMARY KEY,
+            username               TEXT UNIQUE NOT NULL,
+            email                  TEXT UNIQUE NOT NULL,
+            password_hash          TEXT NOT NULL,
+            notify_ntfy            TEXT,
+            is_premium             INTEGER NOT NULL DEFAULT 0,
+            stripe_customer_id     TEXT,
+            stripe_subscription_id TEXT,
+            created_at             TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )""",
         """CREATE TABLE IF NOT EXISTS game_entries (
             id          SERIAL PRIMARY KEY,

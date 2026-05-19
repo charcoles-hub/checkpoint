@@ -1,6 +1,8 @@
 import asyncio
+import os
+import stripe
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import httpx
@@ -10,6 +12,13 @@ from auth import hash_pw, verify_pw, make_token, current_user, require_auth
 from alerts import check_alerts
 
 load_dotenv()
+
+STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
+STRIPE_PRICE_ID = os.getenv("STRIPE_PRICE_ID", "")
+STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
+APP_URL = os.getenv("APP_URL", "https://mycheckpoint.games")
+if STRIPE_SECRET_KEY:
+    stripe.api_key = STRIPE_SECRET_KEY
 
 
 @asynccontextmanager
@@ -151,7 +160,7 @@ def update_settings(body: dict, user=Depends(require_auth)):
     return {"ok": True}
 
 
-def _pub(u): return {"id": u["id"], "username": u["username"], "email": u["email"], "notify_ntfy": u.get("notify_ntfy")}
+def _pub(u): return {"id": u["id"], "username": u["username"], "email": u["email"], "notify_ntfy": u.get("notify_ntfy"), "is_premium": bool(u.get("is_premium", 0))}
 
 
 # ── Public profiles ────────────────────────────────────
@@ -349,11 +358,20 @@ def get_alerts(user=Depends(require_auth)):
     return [dict(r) for r in rows]
 
 
+FREE_ALERT_LIMIT = 3
+
 @app.post("/api/alerts")
 def set_alert(body: AlertIn, user=Depends(require_auth)):
     if body.target_price <= 0:
         raise HTTPException(400, "El precio objetivo debe ser mayor que 0")
     db = get_db()
+    if not user.get("is_premium"):
+        count = db.execute(
+            "SELECT COUNT(*) as c FROM price_alerts WHERE user_id=? AND triggered=0", (user["id"],)
+        ).fetchone()
+        if count["c"] >= FREE_ALERT_LIMIT:
+            db.close()
+            raise HTTPException(403, f"Límite de {FREE_ALERT_LIMIT} alertas gratuitas alcanzado. Hazte Premium para añadir más.")
     db.execute("""
         INSERT INTO price_alerts (user_id, steam_appid, game_name, game_image, target_price)
         VALUES (?,?,?,?,?)
@@ -369,6 +387,82 @@ def delete_alert(appid: int, user=Depends(require_auth)):
     db = get_db()
     db.execute("DELETE FROM price_alerts WHERE user_id=? AND steam_appid=?", (user["id"], appid))
     db.commit(); db.close()
+    return {"ok": True}
+
+
+# ── Billing (Stripe) ──────────────────────────────────
+@app.post("/api/billing/checkout")
+def create_checkout(user=Depends(require_auth)):
+    if not STRIPE_SECRET_KEY or not STRIPE_PRICE_ID:
+        raise HTTPException(503, "Pagos no configurados")
+    db = get_db()
+    row = db.execute("SELECT is_premium, stripe_customer_id FROM users WHERE id=?", (user["id"],)).fetchone()
+    db.close()
+    if row and row["is_premium"]:
+        raise HTTPException(400, "Ya eres premium")
+    params = {
+        "mode": "subscription",
+        "line_items": [{"price": STRIPE_PRICE_ID, "quantity": 1}],
+        "success_url": f"{APP_URL}/?premium=success",
+        "cancel_url": f"{APP_URL}/?premium=cancel",
+        "metadata": {"user_id": str(user["id"])},
+    }
+    customer_id = row["stripe_customer_id"] if row else None
+    if customer_id:
+        params["customer"] = customer_id
+    else:
+        params["customer_email"] = user["email"]
+    session = stripe.checkout.Session.create(**params)
+    return {"url": session.url}
+
+
+@app.post("/api/billing/portal")
+def billing_portal(user=Depends(require_auth)):
+    if not STRIPE_SECRET_KEY:
+        raise HTTPException(503, "Pagos no configurados")
+    db = get_db()
+    row = db.execute("SELECT stripe_customer_id FROM users WHERE id=?", (user["id"],)).fetchone()
+    db.close()
+    if not row or not row["stripe_customer_id"]:
+        raise HTTPException(400, "No tienes suscripción activa")
+    session = stripe.billing_portal.Session.create(
+        customer=row["stripe_customer_id"],
+        return_url=f"{APP_URL}/mylist",
+    )
+    return {"url": session.url}
+
+
+@app.post("/api/billing/webhook")
+async def stripe_webhook(request: Request):
+    if not STRIPE_WEBHOOK_SECRET:
+        raise HTTPException(503, "Webhook no configurado")
+    payload = await request.body()
+    sig = request.headers.get("stripe-signature", "")
+    try:
+        event = stripe.Webhook.construct_event(payload, sig, STRIPE_WEBHOOK_SECRET)
+    except Exception as e:
+        raise HTTPException(400, str(e))
+    db = get_db()
+    try:
+        if event["type"] == "checkout.session.completed":
+            s = event["data"]["object"]
+            user_id = int(s["metadata"]["user_id"])
+            db.execute(
+                "UPDATE users SET is_premium=1, stripe_customer_id=?, stripe_subscription_id=? WHERE id=?",
+                (s["customer"], s["subscription"], user_id)
+            )
+            db.commit()
+        elif event["type"] == "customer.subscription.deleted":
+            sub = event["data"]["object"]
+            db.execute("UPDATE users SET is_premium=0 WHERE stripe_customer_id=?", (sub["customer"],))
+            db.commit()
+        elif event["type"] == "customer.subscription.updated":
+            sub = event["data"]["object"]
+            active = 1 if sub["status"] in ("active", "trialing") else 0
+            db.execute("UPDATE users SET is_premium=? WHERE stripe_customer_id=?", (active, sub["customer"]))
+            db.commit()
+    finally:
+        db.close()
     return {"ok": True}
 
 

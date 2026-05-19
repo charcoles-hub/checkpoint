@@ -24,6 +24,7 @@
         <button class="btn-user" id="btn-username"></button>
         <div class="user-dropdown" id="user-dropdown">
           <button id="btn-settings">Notificaciones</button>
+          <button id="btn-premium-menu">⭐ Premium</button>
           <button id="btn-logout">Cerrar sesión</button>
         </div>
       </div>
@@ -188,6 +189,29 @@
         <input class="field-input" type="password" id="reg-password" required placeholder="Mínimo 6 caracteres" minlength="6" />
         <button class="btn-primary w-full" type="submit">Crear cuenta</button>
       </form>
+    </div>
+  </div>
+</div>
+
+<!-- Premium modal -->
+<div class="modal-overlay" id="premium-overlay">
+  <div class="modal modal-sm" id="premium-modal">
+    <button class="modal-close" id="premium-close">✕</button>
+    <div style="padding:32px 28px;text-align:center">
+      <div style="font-size:2.5rem;margin-bottom:12px">⭐</div>
+      <h3 style="font-size:1.4rem;font-weight:800;margin-bottom:8px">Checkpoint Premium</h3>
+      <p style="color:var(--muted);margin-bottom:24px;font-size:0.95rem">Apoya el proyecto y desbloquea todas las funciones</p>
+      <div class="premium-features">
+        <div class="premium-feature">✓ Alertas de precio <strong>ilimitadas</strong></div>
+        <div class="premium-feature">✓ Insignia <strong>⭐ Premium</strong> en tu perfil</div>
+        <div class="premium-feature">✓ Apoyas el desarrollo de la app</div>
+      </div>
+      <div style="margin:24px 0 8px">
+        <span style="font-size:2rem;font-weight:800">3,99€</span>
+        <span style="color:var(--muted)">/mes</span>
+      </div>
+      <button class="btn-primary w-full" id="btn-go-premium" style="font-size:1rem;padding:14px">Hazte Premium</button>
+      <p style="color:var(--muted);font-size:0.75rem;margin-top:12px">Cancela cuando quieras · Pago seguro con Stripe</p>
     </div>
   </div>
 </div>

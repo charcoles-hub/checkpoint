@@ -565,6 +565,13 @@ body {
 .feed-game { font-weight: 500; font-size: 0.95rem; }
 .feed-notes { color: var(--muted); font-size: 0.82rem; font-style: italic; margin-top: 4px; }
 
+.premium-features { text-align:left; margin-bottom:8px; }
+.premium-feature {
+  padding: 8px 12px; margin-bottom: 6px;
+  background: var(--surface2); border-radius: 8px; font-size: 0.9rem;
+}
+.premium-badge { font-size: 0.8em; vertical-align: middle; }
+
 .my-entry-box {
   margin-top: 20px; padding: 16px;
   background: var(--surface2); border: 1px solid var(--border); border-radius: 10px;

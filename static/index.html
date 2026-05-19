@@ -23,6 +23,7 @@
     <div class="nav-right" id="nav-right">
       <button class="btn-ghost" id="nav-explore" data-i18n="nav.explore">Explorar</button>
       <button class="btn-ghost" id="nav-ranking" data-i18n="nav.ranking">Ranking</button>
+      <button class="btn-ghost" id="nav-community" data-i18n="nav.community">Comunidad</button>
       <button class="btn-ghost" id="nav-mylist" style="display:none" data-i18n="nav.mylist">Mi lista</button>
       <div class="user-menu" id="user-menu" style="display:none">
         <button class="btn-user" id="btn-username"></button>
@@ -79,6 +80,27 @@
         <div class="loading"><div class="spinner"></div><p data-i18n="loading.games">Cargando...</p></div>
       </div>
       <div class="pagination" id="pagination"></div>
+    </section>
+  </div>
+
+  <!-- COMMUNITY VIEW -->
+  <div id="view-community" style="display:none">
+    <section class="games-section" style="padding-top:100px">
+      <div class="section-header">
+        <div>
+          <h2 data-i18n="community.title">Comunidad</h2>
+          <p style="color:var(--muted);font-size:0.9rem;margin-top:4px" data-i18n="community.subtitle">Descubre otros jugadores y sigue su actividad</p>
+        </div>
+      </div>
+      <div class="community-search-wrap">
+        <div class="search-bar" style="max-width:480px;margin:0 0 24px">
+          <span class="search-icon">⌕</span>
+          <input type="text" id="community-search-input" autocomplete="off" data-i18n-placeholder="following.search" placeholder="Buscar jugadores por nombre..." />
+        </div>
+        <div id="community-search-results"></div>
+      </div>
+      <div id="community-following-list"></div>
+      <div id="community-feed"></div>
     </section>
   </div>
 

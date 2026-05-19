@@ -2,6 +2,7 @@ const LANG = navigator.language.startsWith('es') ? 'es' : 'en';
 
 const STRINGS = {
   es: {
+    'nav.community': 'Comunidad',
     'nav.explore': 'Explorar',
     'nav.ranking': 'Ranking',
     'nav.mylist': 'Mi lista',
@@ -195,6 +196,11 @@ const STRINGS = {
     'toast.premium': '⭐ ¡Ya eres Premium! Gracias por tu apoyo',
     'toast.steam_imported': '🎮 {n} juegos importados desde Steam',
     'toast.invalid_price': 'Introduce un precio válido',
+    'toast.game_removed': 'Juego eliminado de tu lista',
+
+    'community.title': 'Comunidad',
+    'community.subtitle': 'Descubre otros jugadores y sigue su actividad',
+    'modal.btn_remove': '🗑 Eliminar de mi lista',
 
     'time.now': 'ahora',
     'time.minutes': 'hace {n}m',
@@ -204,6 +210,7 @@ const STRINGS = {
   },
 
   en: {
+    'nav.community': 'Community',
     'nav.explore': 'Explore',
     'nav.ranking': 'Ranking',
     'nav.mylist': 'My list',
@@ -397,6 +404,11 @@ const STRINGS = {
     'toast.premium': "⭐ You're now Premium! Thank you for your support",
     'toast.steam_imported': '🎮 {n} games imported from Steam',
     'toast.invalid_price': 'Enter a valid price',
+    'toast.game_removed': 'Game removed from your list',
+
+    'community.title': 'Community',
+    'community.subtitle': 'Discover other players and follow their activity',
+    'modal.btn_remove': '🗑 Remove from list',
 
     'time.now': 'just now',
     'time.minutes': '{n}m ago',

@@ -763,6 +763,7 @@ async def games_by_genre(genre_key: str, page: int = 1):
 @app.get("/explore")
 @app.get("/explore/{genre_key}")
 @app.get("/reset-password")
+@app.get("/community")
 async def spa_fallback():
     return FileResponse("static/index.html")
 

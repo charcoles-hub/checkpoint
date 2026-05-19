@@ -19,7 +19,7 @@ let totalGames = 0;
 let genreCache = null;
 
 // ── Views ────────────────────────────────────────────
-const VIEWS = ['home', 'mylist', 'ranking', 'profile', 'explore'];
+const VIEWS = ['home', 'mylist', 'ranking', 'profile', 'explore', 'community'];
 
 function showView(name) {
   VIEWS.forEach(v => {
@@ -48,6 +48,7 @@ document.getElementById('nav-home').addEventListener('click', e => { e.preventDe
 document.getElementById('nav-mylist').addEventListener('click', () => { history.pushState({}, '', '/mylist'); showView('mylist'); loadMyList(); closeMenu(); });
 document.getElementById('nav-ranking').addEventListener('click', () => { history.pushState({}, '', '/ranking'); showView('ranking'); loadRanking(); closeMenu(); });
 document.getElementById('nav-explore').addEventListener('click', () => { history.pushState({}, '', '/explore'); showView('explore'); loadExplore(); closeMenu(); });
+document.getElementById('nav-community').addEventListener('click', () => { history.pushState({}, '', '/community'); showView('community'); loadCommunity(); closeMenu(); });
 
 function resetHome() {
   currentPage = 1; currentSearch = ''; currentGenre = ''; currentPlatform = ''; currentSort = 'popular';
@@ -86,6 +87,7 @@ function route() {
     else loadExplore();
   }
   else if (path.startsWith('/u/')) { showView('profile'); loadProfile(path.slice(3)); }
+  else if (path === '/community') { showView('community'); loadCommunity(); }
   else { showView('home'); loadGames(); initGenrePills(); }
 }
 
@@ -157,7 +159,7 @@ document.querySelectorAll('#sort-tabs .sort-tab').forEach(tab => {
 });
 
 // ── Game cards ───────────────────────────────────────
-function renderCard(game, onClick) {
+function renderCard(game, onClick, onDelete) {
   const platforms = (game.platforms || []).slice(0, 3);
   const statusLabel = { played: t('status.played'), playing: t('status.playing'), wishlist: t('status.wishlist') };
   const name = game.name || game.game_name;
@@ -180,6 +182,14 @@ function renderCard(game, onClick) {
       ${game.notes ? `<div class="game-notes">"${escHtml(game.notes.slice(0, 60))}${game.notes.length > 60 ? '…' : ''}"</div>` : ''}
     </div>
   `;
+  if (onDelete) {
+    const del = document.createElement('button');
+    del.className = 'card-delete-btn';
+    del.title = t('modal.btn_remove');
+    del.textContent = '✕';
+    del.addEventListener('click', e => { e.stopPropagation(); onDelete(); });
+    card.appendChild(del);
+  }
   const appid = game.id || game.steam_appid;
   card.addEventListener('click', onClick || (() => openModal(appid)));
   return card;
@@ -490,8 +500,9 @@ async function openModal(gameId) {
       ${myEntry ? `
       <div class="my-entry-box">
         <div class="my-entry-header">
-          <span class="status-badge status-${myEntry.status}">${{played:'Jugado',playing:'Jugando',wishlist:'Deseado'}[myEntry.status]}</span>
+          <span class="status-badge status-${myEntry.status}">${{played:t('status.played'),playing:t('status.playing'),wishlist:t('status.wishlist')}[myEntry.status]}</span>
           ${myEntry.rating ? `<span class="game-rating">${myEntry.rating}/10</span>` : ''}
+          <button class="btn-ghost" id="btn-remove-game" style="margin-left:auto;padding:4px 10px;font-size:0.8rem;color:var(--muted)">${t('modal.btn_remove')}</button>
         </div>
         ${myEntry.notes ? `<p class="my-entry-notes">"${escHtml(myEntry.notes)}"</p>` : ''}
         <div class="draft-section">
@@ -559,6 +570,12 @@ async function openModal(gameId) {
     document.getElementById('btn-skip-alert')?.addEventListener('click', () => {
       document.getElementById('alert-form').style.display = 'none';
       showToast(t('toast.wishlist'));
+    });
+    document.getElementById('btn-remove-game')?.addEventListener('click', async () => {
+      await AUTH.apiFetch(`/api/list/${g.id}`, { method: 'DELETE' });
+      closeModal();
+      showToast(t('toast.game_removed'));
+      if (document.getElementById('view-mylist').style.display !== 'none') loadMyList();
     });
     document.getElementById('btn-save-draft')?.addEventListener('click', async () => {
       if (!AUTH.user) { AUTH.showModal('login'); return; }
@@ -635,7 +652,12 @@ async function loadMyList() {
       });
       return;
     }
-    filtered.forEach(e => listGrid.appendChild(renderCard(e, () => openModal(e.steam_appid))));
+    filtered.forEach(e => listGrid.appendChild(renderCard(e, () => openModal(e.steam_appid), async () => {
+      await AUTH.apiFetch(`/api/list/${e.steam_appid}`, { method: 'DELETE' });
+      entries.splice(entries.indexOf(e), 1);
+      renderList();
+      showToast(t('toast.game_removed'));
+    })));
   }
 
   document.querySelectorAll('#mylist-tabs .list-tab').forEach(tab => {
@@ -932,6 +954,140 @@ async function loadProfile(username) {
     });
     renderProfileList();
   } catch { header.innerHTML = `<div class="no-results">${t('profile.not_found')}</div>`; }
+}
+
+// ── Community view ────────────────────────────────────
+let communityLoaded = false;
+
+async function loadCommunity() {
+  communityLoaded = false;
+  const searchInput = document.getElementById('community-search-input');
+  const resultsEl = document.getElementById('community-search-results');
+  const listEl = document.getElementById('community-following-list');
+  const feedEl = document.getElementById('community-feed');
+
+  listEl.innerHTML = '';
+  feedEl.innerHTML = '';
+
+  // User search
+  let searchTO = null;
+  const freshInput = searchInput.cloneNode(true);
+  searchInput.parentNode.replaceChild(freshInput, searchInput);
+  freshInput.addEventListener('input', () => {
+    clearTimeout(searchTO);
+    const q = freshInput.value.trim();
+    if (!q) { resultsEl.innerHTML = ''; return; }
+    searchTO = setTimeout(async () => {
+      const users = await AUTH.apiFetch(`/api/users/search?q=${encodeURIComponent(q)}`);
+      if (!users.length) { resultsEl.innerHTML = `<p style="color:var(--muted);padding:8px 0">${t('following.no_results')}</p>`; return; }
+      resultsEl.innerHTML = '';
+      users.forEach(u => {
+        const row = document.createElement('div');
+        row.className = 'user-row';
+        row.innerHTML = `
+          <div class="user-avatar-sm">${u.username[0].toUpperCase()}</div>
+          <div style="flex:1">
+            <span class="user-row-name">${u.username}</span>
+            ${u.is_premium ? '<span class="premium-badge" style="font-size:0.8rem">⭐</span>' : ''}
+            <span style="color:var(--muted);font-size:0.8rem;margin-left:8px">${t('following.games', {n: u.total_games})}</span>
+          </div>
+          ${AUTH.user ? `<button class="btn-follow ${u.is_following ? 'following' : ''}" data-username="${u.username}">
+            ${u.is_following ? t('following.btn_following') : t('following.btn_follow')}
+          </button>` : ''}
+        `;
+        const btn = row.querySelector('.btn-follow');
+        if (btn) {
+          btn.addEventListener('click', async () => {
+            if (btn.classList.contains('following')) {
+              await AUTH.apiFetch(`/api/follow/${u.username}`, { method: 'DELETE' });
+              btn.classList.remove('following'); btn.textContent = t('following.btn_follow');
+              showToast(t('toast.unfollow', {u: u.username}));
+            } else {
+              await AUTH.apiFetch(`/api/follow/${u.username}`, { method: 'POST' });
+              btn.classList.add('following'); btn.textContent = t('following.btn_following');
+              showToast(t('toast.follow', {u: u.username}));
+            }
+            communityLoaded = false;
+          });
+        }
+        row.querySelector('.user-avatar-sm').addEventListener('click', () => {
+          history.pushState({}, '', `/u/${u.username}`); showView('profile'); loadProfile(u.username);
+        });
+        row.querySelector('.user-row-name').addEventListener('click', () => {
+          history.pushState({}, '', `/u/${u.username}`); showView('profile'); loadProfile(u.username);
+        });
+        resultsEl.appendChild(row);
+      });
+    }, 300);
+  });
+
+  if (!AUTH.user) return;
+  if (communityLoaded) return;
+  communityLoaded = true;
+
+  listEl.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  const { following, feed } = await AUTH.apiFetch('/api/following');
+
+  if (!following.length) {
+    listEl.innerHTML = `<p style="color:var(--muted);margin:16px 0">${t('following.empty')}</p>`;
+  } else {
+    listEl.innerHTML = `<h4 style="margin:24px 0 12px;color:var(--muted2);font-size:0.9rem;text-transform:uppercase;letter-spacing:.05em">${t('following.title')}</h4>`;
+    following.forEach(u => {
+      const row = document.createElement('div');
+      row.className = 'user-row';
+      row.innerHTML = `
+        <div class="user-avatar-sm">${u.username[0].toUpperCase()}</div>
+        <span class="user-row-name">${u.username}</span>
+        <button class="btn-follow following" data-username="${u.username}">${t('following.btn_following')}</button>
+      `;
+      row.querySelector('.user-avatar-sm').addEventListener('click', () => {
+        history.pushState({}, '', `/u/${u.username}`); showView('profile'); loadProfile(u.username);
+      });
+      row.querySelector('.user-row-name').addEventListener('click', () => {
+        history.pushState({}, '', `/u/${u.username}`); showView('profile'); loadProfile(u.username);
+      });
+      row.querySelector('.btn-follow').addEventListener('click', async () => {
+        await AUTH.apiFetch(`/api/follow/${u.username}`, { method: 'DELETE' });
+        row.remove(); communityLoaded = false;
+        showToast(t('toast.unfollow', {u: u.username}));
+      });
+      listEl.appendChild(row);
+    });
+  }
+
+  if (!feed.length) {
+    feedEl.innerHTML = `<p style="color:var(--muted);margin-top:16px">${t('following.feed_empty')}</p>`;
+  } else {
+    feedEl.innerHTML = `<h4 style="margin:24px 0 12px;color:var(--muted2);font-size:0.9rem;text-transform:uppercase;letter-spacing:.05em">${t('following.activity')}</h4>`;
+    const statusColor = { played: 'var(--purple)', playing: 'var(--cyan)', wishlist: 'var(--muted2)' };
+    const statusLabel = { played: t('status.played'), playing: t('status.playing'), wishlist: t('status.wishlist') };
+    feed.forEach(e => {
+      const item = document.createElement('div');
+      item.className = 'feed-item';
+      item.innerHTML = `
+        <img src="${e.game_image || ''}" class="feed-thumb" onerror="this.style.display='none'" />
+        <div class="feed-info">
+          <div class="feed-user">
+            <span class="feed-username" data-u="${e.player}">${e.player}</span>
+            <span style="color:var(--muted);font-size:0.82rem"> · ${timeAgo(e.added_at)}</span>
+          </div>
+          <div class="feed-game">${e.game_name}</div>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:4px">
+            <span style="font-size:0.8rem;color:${statusColor[e.status]}">${statusLabel[e.status]}</span>
+            ${e.rating ? `<span class="game-rating" style="font-size:0.8rem">${e.rating}/10</span>` : ''}
+          </div>
+          ${e.notes ? `<div class="feed-notes">"${escHtml(e.notes.slice(0, 80))}${e.notes.length > 80 ? '…' : ''}"</div>` : ''}
+        </div>
+      `;
+      item.querySelector('.feed-username').addEventListener('click', () => {
+        history.pushState({}, '', `/u/${e.player}`); showView('profile'); loadProfile(e.player);
+      });
+      item.addEventListener('click', ev => {
+        if (!ev.target.classList.contains('feed-username')) openModal(e.steam_appid);
+      });
+      feedEl.appendChild(item);
+    });
+  }
 }
 
 // ── Steam import ──────────────────────────────────────

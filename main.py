@@ -436,7 +436,7 @@ def ranking():
                COUNT(*) as votes
         FROM game_entries
         WHERE rating IS NOT NULL AND status = 'played'
-        GROUP BY steam_appid
+        GROUP BY steam_appid, game_name, game_image
         ORDER BY avg_rating DESC, votes DESC
         LIMIT 50
     """).fetchall()

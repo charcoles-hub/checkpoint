@@ -1,3 +1,7 @@
+function escHtml(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
 const grid = document.getElementById('games-grid');
 const searchInput = document.getElementById('search-input');
 const sectionTitle = document.getElementById('section-title');
@@ -161,7 +165,7 @@ function renderCard(game, onClick) {
         ${game.price ? `<span class="game-year" style="color:var(--cyan)">${game.price}</span>` : ''}
       </div>
       ${platforms.length ? `<div class="game-platforms">${platforms.map(p => `<span class="platform-tag">${p}</span>`).join('')}</div>` : ''}
-      ${game.notes ? `<div class="game-notes">"${game.notes.slice(0, 60)}${game.notes.length > 60 ? '…' : ''}"</div>` : ''}
+      ${game.notes ? `<div class="game-notes">"${escHtml(game.notes.slice(0, 60))}${game.notes.length > 60 ? '…' : ''}"</div>` : ''}
     </div>
   `;
   const appid = game.id || game.steam_appid;
@@ -464,10 +468,10 @@ async function openModal(gameId) {
           <span class="status-badge status-${myEntry.status}">${{played:'Jugado',playing:'Jugando',wishlist:'Deseado'}[myEntry.status]}</span>
           ${myEntry.rating ? `<span class="game-rating">${myEntry.rating}/10</span>` : ''}
         </div>
-        ${myEntry.notes ? `<p class="my-entry-notes">"${myEntry.notes}"</p>` : ''}
+        ${myEntry.notes ? `<p class="my-entry-notes">"${escHtml(myEntry.notes)}"</p>` : ''}
         <div class="draft-section">
           <label style="font-size:0.82rem;color:var(--muted);display:block;margin-bottom:6px">Mis apuntes privados</label>
-          <textarea id="draft-input" class="field-input" rows="3" placeholder="Ideas, impresiones, pendientes..." style="resize:vertical;margin-bottom:8px">${myEntry.draft_notes || ''}</textarea>
+          <textarea id="draft-input" class="field-input" rows="3" placeholder="Ideas, impresiones, pendientes..." style="resize:vertical;margin-bottom:8px">${escHtml(myEntry.draft_notes || '')}</textarea>
           <button class="btn-ghost" id="btn-save-draft" style="padding:6px 14px;font-size:0.85rem">Guardar apuntes</button>
         </div>
       </div>` : AUTH.user ? `
@@ -541,7 +545,14 @@ async function openModal(gameId) {
       })});
       showToast('📝 Apuntes guardados');
     });
-  } catch { modalContent.innerHTML = '<div class="no-results">Error al cargar el juego.</div>'; }
+  } catch {
+    modalContent.innerHTML = `
+      <div class="no-results" style="padding:40px 0">
+        <p style="font-size:1.5rem;margin-bottom:8px">😕</p>
+        <p>No se pudo cargar el juego.</p>
+        <button class="btn-ghost" style="margin-top:16px" onclick="closeModal()">Cerrar</button>
+      </div>`;
+  }
 }
 
 async function saveEntry(g, status) {
@@ -694,7 +705,7 @@ async function loadFollowingSection() {
             <span style="font-size:0.8rem;color:${statusColor[e.status]}">${statusLabel[e.status]}</span>
             ${e.rating ? `<span class="game-rating" style="font-size:0.8rem">${e.rating}/10</span>` : ''}
           </div>
-          ${e.notes ? `<div class="feed-notes">"${e.notes.slice(0, 80)}${e.notes.length > 80 ? '…' : ''}"</div>` : ''}
+          ${e.notes ? `<div class="feed-notes">"${escHtml(e.notes.slice(0, 80))}${e.notes.length > 80 ? '…' : ''}"</div>` : ''}
         </div>
       `;
       item.querySelector('.feed-username').addEventListener('click', () => {

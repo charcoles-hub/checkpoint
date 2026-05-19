@@ -364,21 +364,25 @@ FREE_ALERT_LIMIT = 3
 def set_alert(body: AlertIn, user=Depends(require_auth)):
     if body.target_price <= 0:
         raise HTTPException(400, "El precio objetivo debe ser mayor que 0")
+    if body.target_price > 9999:
+        raise HTTPException(400, "El precio objetivo no puede superar 9999€")
     db = get_db()
-    if not user.get("is_premium"):
-        count = db.execute(
-            "SELECT COUNT(*) as c FROM price_alerts WHERE user_id=? AND triggered=0", (user["id"],)
-        ).fetchone()
-        if count["c"] >= FREE_ALERT_LIMIT:
-            db.close()
-            raise HTTPException(403, f"Límite de {FREE_ALERT_LIMIT} alertas gratuitas alcanzado. Hazte Premium para añadir más.")
-    db.execute("""
-        INSERT INTO price_alerts (user_id, steam_appid, game_name, game_image, target_price)
-        VALUES (?,?,?,?,?)
-        ON CONFLICT(user_id, steam_appid) DO UPDATE SET
-            target_price=excluded.target_price, triggered=0, triggered_at=NULL
-    """, (user["id"], body.steam_appid, body.game_name, body.game_image, body.target_price))
-    db.commit(); db.close()
+    try:
+        if not user.get("is_premium"):
+            count = db.execute(
+                "SELECT COUNT(*) as c FROM price_alerts WHERE user_id=? AND triggered=0", (user["id"],)
+            ).fetchone()
+            if count["c"] >= FREE_ALERT_LIMIT:
+                raise HTTPException(403, f"Límite de {FREE_ALERT_LIMIT} alertas gratuitas alcanzado. Hazte Premium para añadir más.")
+        db.execute("""
+            INSERT INTO price_alerts (user_id, steam_appid, game_name, game_image, target_price)
+            VALUES (?,?,?,?,?)
+            ON CONFLICT(user_id, steam_appid) DO UPDATE SET
+                target_price=excluded.target_price, triggered=0, triggered_at=NULL
+        """, (user["id"], body.steam_appid, body.game_name, body.game_image, body.target_price))
+        db.commit()
+    finally:
+        db.close()
     return {"ok": True}
 
 
@@ -396,8 +400,10 @@ def create_checkout(user=Depends(require_auth)):
     if not STRIPE_SECRET_KEY or not STRIPE_PRICE_ID:
         raise HTTPException(503, "Pagos no configurados")
     db = get_db()
-    row = db.execute("SELECT is_premium, stripe_customer_id FROM users WHERE id=?", (user["id"],)).fetchone()
-    db.close()
+    try:
+        row = db.execute("SELECT is_premium, stripe_customer_id FROM users WHERE id=?", (user["id"],)).fetchone()
+    finally:
+        db.close()
     if row and row["is_premium"]:
         raise HTTPException(400, "Ya eres premium")
     params = {
@@ -412,7 +418,10 @@ def create_checkout(user=Depends(require_auth)):
         params["customer"] = customer_id
     else:
         params["customer_email"] = user["email"]
-    session = stripe.checkout.Session.create(**params)
+    try:
+        session = stripe.checkout.Session.create(**params)
+    except stripe.error.StripeError as e:
+        raise HTTPException(502, f"Error de pago: {e.user_message or str(e)}")
     return {"url": session.url}
 
 

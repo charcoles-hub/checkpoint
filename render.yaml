@@ -17,3 +17,5 @@ services:
         sync: false
       - key: STRIPE_WEBHOOK_SECRET
         sync: false
+      - key: STEAM_API_KEY
+        sync: false

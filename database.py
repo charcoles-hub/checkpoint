@@ -60,14 +60,16 @@ def init_db():
 def _init_sqlite():
     db = get_db()
     # Safe migrations
-    for col, definition in [
-        ("draft_notes", "TEXT"),
-        ("is_premium", "INTEGER NOT NULL DEFAULT 0"),
-        ("stripe_customer_id", "TEXT"),
-        ("stripe_subscription_id", "TEXT"),
+    for table, col, definition in [
+        ("game_entries", "draft_notes", "TEXT"),
+        ("game_entries", "playtime", "INTEGER"),
+        ("users", "is_premium", "INTEGER NOT NULL DEFAULT 0"),
+        ("users", "stripe_customer_id", "TEXT"),
+        ("users", "stripe_subscription_id", "TEXT"),
+        ("users", "steam_id", "TEXT"),
     ]:
         try:
-            db.execute(f"ALTER TABLE {'game_entries' if col == 'draft_notes' else 'users'} ADD COLUMN {col} {definition}")
+            db.execute(f"ALTER TABLE {table} ADD COLUMN {col} {definition}")
             db.commit()
         except Exception:
             pass
@@ -81,6 +83,7 @@ def _init_sqlite():
             is_premium             INTEGER NOT NULL DEFAULT 0,
             stripe_customer_id     TEXT,
             stripe_subscription_id TEXT,
+            steam_id               TEXT,
             created_at             TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
         CREATE TABLE IF NOT EXISTS game_entries (
@@ -93,6 +96,7 @@ def _init_sqlite():
             rating      INTEGER CHECK(rating BETWEEN 1 AND 10),
             notes       TEXT,
             draft_notes TEXT,
+            playtime    INTEGER,
             added_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(user_id, steam_appid)
         );
@@ -126,9 +130,11 @@ def _init_pg():
     # Safe migrations for columns added after initial deploy
     migrations = [
         "ALTER TABLE game_entries ADD COLUMN IF NOT EXISTS draft_notes TEXT",
+        "ALTER TABLE game_entries ADD COLUMN IF NOT EXISTS playtime INTEGER",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_premium INTEGER NOT NULL DEFAULT 0",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_subscription_id TEXT",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS steam_id TEXT",
     ]
     for m in migrations:
         try:
@@ -146,6 +152,7 @@ def _init_pg():
             is_premium             INTEGER NOT NULL DEFAULT 0,
             stripe_customer_id     TEXT,
             stripe_subscription_id TEXT,
+            steam_id               TEXT,
             created_at             TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )""",
         """CREATE TABLE IF NOT EXISTS game_entries (
@@ -158,6 +165,7 @@ def _init_pg():
             rating      INTEGER CHECK(rating BETWEEN 1 AND 10),
             notes       TEXT,
             draft_notes TEXT,
+            playtime    INTEGER,
             added_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(user_id, steam_appid)
         )""",

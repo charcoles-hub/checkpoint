@@ -163,6 +163,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-settings').addEventListener('click', () => {
     document.getElementById('user-dropdown').classList.remove('open');
     document.getElementById('ntfy-topic').value = AUTH.user?.notify_ntfy || '';
+    document.getElementById('steam-id-input').value = AUTH.user?.steam_id || '';
     document.getElementById('settings-overlay').classList.add('open');
   });
   document.getElementById('settings-close').addEventListener('click', () => {
@@ -174,13 +175,26 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   document.getElementById('btn-save-settings').addEventListener('click', async () => {
     const topic = document.getElementById('ntfy-topic').value.trim();
+    const steamId = document.getElementById('steam-id-input').value.trim();
     try {
-      await AUTH.apiFetch('/api/auth/settings', { method: 'PATCH', body: JSON.stringify({ notify_ntfy: topic || null }) });
+      await AUTH.apiFetch('/api/auth/settings', { method: 'PATCH', body: JSON.stringify({
+        notify_ntfy: topic || null,
+        steam_id: steamId || null,
+      })});
       AUTH.user.notify_ntfy = topic || null;
+      AUTH.user.steam_id = steamId || null;
       localStorage.setItem('gl_user', JSON.stringify(AUTH.user));
       document.getElementById('settings-overlay').classList.remove('open');
     } catch (err) {
       alert(err.message);
     }
+  });
+
+  // Steam import button
+  document.getElementById('btn-steam-preview').addEventListener('click', () => {
+    const steamId = document.getElementById('steam-id-input').value.trim();
+    if (!steamId) { alert('Introduce tu Steam ID primero'); return; }
+    document.getElementById('settings-overlay').classList.remove('open');
+    openSteamImport(steamId);
   });
 });

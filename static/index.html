@@ -7,6 +7,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/css/style.css" />
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#8b5cf6" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Checkpoint" />
 </head>
 <body>
 
@@ -221,11 +225,28 @@
   <div class="modal modal-sm" id="settings-modal">
     <button class="modal-close" id="settings-close">✕</button>
     <div style="padding:32px 28px">
-      <h3 style="margin-bottom:20px;font-size:1.2rem;font-weight:700">Notificaciones</h3>
+      <h3 style="margin-bottom:20px;font-size:1.2rem;font-weight:700">Ajustes</h3>
+
+      <label class="field-label">Steam ID o nombre de usuario de Steam</label>
+      <input class="field-input" type="text" id="steam-id-input" placeholder="ej: sergiogg o 76561198xxxxxxxxx" />
+      <p style="color:var(--muted);font-size:0.8rem;margin:-8px 0 16px">Tu perfil de Steam debe ser público. Puedes usar tu nombre de usuario o tu SteamID64.</p>
+      <button class="btn-ghost w-full" id="btn-steam-preview" style="margin-bottom:20px">🎮 Conectar Steam e importar juegos</button>
+
       <label class="field-label">Topic de ntfy.sh (para alertas de precio)</label>
       <input class="field-input" type="text" id="ntfy-topic" placeholder="mi-topic-secreto" />
       <p style="color:var(--muted);font-size:0.8rem;margin:-8px 0 16px">Recibirás una notificación push en ntfy.sh cuando baje el precio. Deja vacío para desactivar.</p>
-      <button class="btn-primary w-full" id="btn-save-settings">Guardar</button>
+      <button class="btn-primary w-full" id="btn-save-settings">Guardar ajustes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Steam import modal -->
+<div class="modal-overlay" id="steam-overlay">
+  <div class="modal modal-sm" id="steam-modal" style="max-height:90vh;overflow-y:auto">
+    <button class="modal-close" id="steam-close">✕</button>
+    <div style="padding:28px">
+      <h3 style="font-size:1.2rem;font-weight:700;margin-bottom:6px">🎮 Importar desde Steam</h3>
+      <div id="steam-content"></div>
     </div>
   </div>
 </div>

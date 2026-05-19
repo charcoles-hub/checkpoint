@@ -17,6 +17,7 @@ STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
 STRIPE_PRICE_ID = os.getenv("STRIPE_PRICE_ID", "")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
 APP_URL = os.getenv("APP_URL", "https://mycheckpoint.games")
+STEAM_API_KEY = os.getenv("STEAM_API_KEY", "")
 if STRIPE_SECRET_KEY:
     stripe.api_key = STRIPE_SECRET_KEY
 
@@ -150,7 +151,7 @@ def me(user=Depends(require_auth)):
 
 @app.patch("/api/auth/settings")
 def update_settings(body: dict, user=Depends(require_auth)):
-    allowed = {"notify_ntfy"}
+    allowed = {"notify_ntfy", "steam_id"}
     updates = {k: v for k, v in body.items() if k in allowed}
     if not updates: raise HTTPException(400, "Nada que actualizar")
     db = get_db()
@@ -160,7 +161,7 @@ def update_settings(body: dict, user=Depends(require_auth)):
     return {"ok": True}
 
 
-def _pub(u): return {"id": u["id"], "username": u["username"], "email": u["email"], "notify_ntfy": u.get("notify_ntfy"), "is_premium": bool(u.get("is_premium", 0))}
+def _pub(u): return {"id": u["id"], "username": u["username"], "email": u["email"], "notify_ntfy": u.get("notify_ntfy"), "is_premium": bool(u.get("is_premium", 0)), "steam_id": u.get("steam_id")}
 
 
 # ── Public profiles ────────────────────────────────────
@@ -201,12 +202,16 @@ def public_profile(username: str, user=Depends(current_user)):
     entries = [dict(e) for e in entries]
     played = [e for e in entries if e["status"] == "played"]
     rated  = [e for e in played if e["rating"]]
+    best = max(rated, key=lambda e: e["rating"]) if rated else None
     stats = {
         "total": len(entries),
         "played": len(played),
         "playing": sum(1 for e in entries if e["status"] == "playing"),
         "wishlist": sum(1 for e in entries if e["status"] == "wishlist"),
         "avg_rating": round(sum(e["rating"] for e in rated) / len(rated), 1) if rated else None,
+        "total_playtime": sum(e["playtime"] or 0 for e in entries),
+        "best_game": best["game_name"] if best else None,
+        "best_rating": best["rating"] if best else None,
     }
     followers_count = db.execute("SELECT COUNT(*) as c FROM follows WHERE following_id=?", (target["id"],)).fetchone()["c"]
     following_count = db.execute("SELECT COUNT(*) as c FROM follows WHERE follower_id=?", (target["id"],)).fetchone()["c"]
@@ -392,6 +397,94 @@ def delete_alert(appid: int, user=Depends(require_auth)):
     db.execute("DELETE FROM price_alerts WHERE user_id=? AND steam_appid=?", (user["id"], appid))
     db.commit(); db.close()
     return {"ok": True}
+
+
+# ── Steam integration ─────────────────────────────────
+STEAM_API = "https://api.steampowered.com"
+
+async def _resolve_steam_id(steam_id: str) -> str:
+    if steam_id.isdigit() and len(steam_id) == 17:
+        return steam_id
+    data = await get(f"{STEAM_API}/ISteamUser/ResolveVanityURL/v1/",
+                     {"key": STEAM_API_KEY, "vanityurl": steam_id})
+    r = data.get("response", {})
+    if r.get("success") != 1:
+        raise HTTPException(404, "Perfil de Steam no encontrado. Comprueba el nombre de usuario.")
+    return r["steamid"]
+
+
+@app.get("/api/steam/preview")
+async def steam_preview(steam_id: str = "", user=Depends(require_auth)):
+    sid = steam_id or user.get("steam_id", "")
+    if not sid:
+        raise HTTPException(400, "Introduce tu Steam ID o nombre de usuario")
+    if not STEAM_API_KEY:
+        raise HTTPException(503, "Steam API no configurada")
+    sid = await _resolve_steam_id(sid.strip())
+    try:
+        data = await get(f"{STEAM_API}/IPlayerService/GetOwnedGames/v1/", {
+            "key": STEAM_API_KEY, "steamid": sid,
+            "include_appinfo": "true", "include_played_free_games": "true",
+        })
+    except Exception:
+        raise HTTPException(403, "No se pudo acceder. Asegúrate de que tu perfil de Steam es público.")
+    games = data.get("response", {}).get("games", [])
+    if not games:
+        raise HTTPException(404, "No se encontraron juegos. El perfil debe ser público.")
+    games_sorted = sorted(games, key=lambda g: g.get("playtime_forever", 0), reverse=True)
+    return {
+        "steam_id": sid,
+        "total": len(games_sorted),
+        "games": [{"appid": g["appid"], "name": g.get("name", f"App {g['appid']}"),
+                   "playtime": g.get("playtime_forever", 0)} for g in games_sorted],
+    }
+
+
+class SteamImportIn(BaseModel):
+    steam_id: str
+    games: list[dict]
+    only_played: bool = True
+
+
+@app.post("/api/steam/import")
+def steam_import(body: SteamImportIn, user=Depends(require_auth)):
+    db = get_db()
+    imported = 0
+    try:
+        db.execute("UPDATE users SET steam_id=? WHERE id=?", (body.steam_id, user["id"]))
+        for g in body.games:
+            playtime = g.get("playtime", 0)
+            if body.only_played and playtime == 0:
+                continue
+            status = "played" if playtime >= 60 else ("playing" if playtime > 0 else "wishlist")
+            image = f"{CDN}/{g['appid']}/header.jpg"
+            db.execute("""
+                INSERT INTO game_entries (user_id, steam_appid, game_name, game_image, status, playtime)
+                VALUES (?,?,?,?,?,?)
+                ON CONFLICT(user_id, steam_appid) DO UPDATE SET playtime=excluded.playtime
+            """, (user["id"], g["appid"], g["name"], image, status, playtime))
+            imported += 1
+        db.commit()
+    finally:
+        db.close()
+    return {"imported": imported}
+
+
+@app.get("/api/steam/achievements/{appid}")
+async def get_achievements(appid: int, user=Depends(require_auth)):
+    steam_id = user.get("steam_id")
+    if not steam_id or not STEAM_API_KEY:
+        return {"total": 0, "achieved": 0, "achievements": []}
+    try:
+        data = await get(f"{STEAM_API}/ISteamUserStats/GetPlayerAchievements/v1/",
+                         {"appid": appid, "key": STEAM_API_KEY, "steamid": steam_id, "l": "spanish"})
+        achievements = data.get("playerstats", {}).get("achievements", [])
+        achieved = sum(1 for a in achievements if a.get("achieved"))
+        unlocked = [a for a in achievements if a.get("achieved")]
+        unlocked.sort(key=lambda a: a.get("unlocktime", 0), reverse=True)
+        return {"total": len(achievements), "achieved": achieved, "achievements": unlocked[:8]}
+    except Exception:
+        return {"total": 0, "achieved": 0, "achievements": []}
 
 
 # ── Billing (Stripe) ──────────────────────────────────

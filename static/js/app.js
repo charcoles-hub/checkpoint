@@ -163,6 +163,7 @@ function renderCard(game, onClick) {
         ${game.avg_rating ? `<span class="game-rating community-rating" title="${game.votes} votos">★ ${game.avg_rating}</span>` : ''}
         ${game.status ? `<span class="status-badge status-${game.status}">${statusLabel[game.status]}</span>` : ''}
         ${game.price ? `<span class="game-year" style="color:var(--cyan)">${game.price}</span>` : ''}
+        ${game.playtime > 0 ? `<span class="game-year" style="color:var(--muted)">${Math.round(game.playtime/60)}h</span>` : ''}
       </div>
       ${platforms.length ? `<div class="game-platforms">${platforms.map(p => `<span class="platform-tag">${p}</span>`).join('')}</div>` : ''}
       ${game.notes ? `<div class="game-notes">"${escHtml(game.notes.slice(0, 60))}${game.notes.length > 60 ? '…' : ''}"</div>` : ''}
@@ -418,9 +419,10 @@ async function openModal(gameId) {
   modalOverlay.classList.add('open');
   document.body.style.overflow = 'hidden';
   try {
-    const [g, myEntry] = await Promise.all([
+    const [g, myEntry, steamAch] = await Promise.all([
       AUTH.apiFetch(`/api/games/${gameId}`),
       AUTH.user ? AUTH.apiFetch(`/api/list/${gameId}`).catch(() => null) : Promise.resolve(null),
+      AUTH.user?.steam_id ? AUTH.apiFetch(`/api/steam/achievements/${gameId}`).catch(() => null) : Promise.resolve(null),
     ]);
     const genres = (g.genres || []).map(x => `<span class="genre-tag">${x}</span>`).join('');
     const plats = (g.platforms || []).slice(0, 5).map(p => `<span class="platform-tag">${p}</span>`).join('');
@@ -438,6 +440,18 @@ async function openModal(gameId) {
       ${genres ? `<div class="detail-genres">${genres}</div>` : ''}
       <p class="detail-desc">${desc}</p>
       ${plats ? `<div class="game-platforms" style="margin-bottom:24px">${plats}</div>` : ''}
+      ${steamAch?.total > 0 ? `
+      <div class="achievements-section">
+        <div class="achievements-header">
+          <span>🏆 Logros</span>
+          <span class="ach-count">${steamAch.achieved}/${steamAch.total}</span>
+        </div>
+        <div class="ach-bar"><div class="ach-progress" style="width:${Math.round(steamAch.achieved/steamAch.total*100)}%"></div></div>
+        ${steamAch.achievements.length ? `<div class="ach-list">${steamAch.achievements.map(a => `
+          <div class="ach-item" title="${escHtml(a.description || '')}">
+            <span class="ach-name">${escHtml(a.name || a.apiname)}</span>
+          </div>`).join('')}</div>` : ''}
+      </div>` : ''}
       <div class="detail-actions">
         <button class="btn-add" id="modal-btn-played">✓ Jugado</button>
         <button class="btn-add" id="modal-btn-playing" style="background:var(--cyan);color:#000">▶ Jugando</button>
@@ -573,20 +587,43 @@ async function loadMyList() {
   let activeStatus = 'all';
   const [entries, alerts] = await Promise.all([AUTH.apiFetch('/api/list'), AUTH.apiFetch('/api/alerts')]);
 
+  // Search bar
+  let listSearch = '';
+  const searchBox = document.createElement('div');
+  searchBox.className = 'list-search-box';
+  searchBox.innerHTML = `<input type="text" class="field-input" id="list-search" placeholder="Buscar en mi lista..." style="max-width:320px;margin-bottom:16px" />`;
+  listGrid.parentNode.insertBefore(searchBox, listGrid);
+  searchBox.querySelector('#list-search').addEventListener('input', e => {
+    listSearch = e.target.value.toLowerCase();
+    renderList();
+  });
+
   function renderList() {
     if (activeStatus === 'siguiendo') {
       listGrid.style.display = 'none';
       followingSection.style.display = '';
       alertsSection.style.display = 'none';
+      searchBox.style.display = 'none';
       loadFollowingSection();
       return;
     }
     listGrid.style.display = '';
     followingSection.style.display = 'none';
     alertsSection.style.display = '';
-    const filtered = activeStatus === 'all' ? entries : entries.filter(e => e.status === activeStatus);
+    searchBox.style.display = '';
+    let filtered = activeStatus === 'all' ? entries : entries.filter(e => e.status === activeStatus);
+    if (listSearch) filtered = filtered.filter(e => (e.game_name || '').toLowerCase().includes(listSearch));
     listGrid.innerHTML = '';
-    if (!filtered.length) { listGrid.innerHTML = '<div class="no-results">No tienes juegos en esta categoría.</div>'; return; }
+    if (!filtered.length) {
+      const isEmpty = entries.length === 0;
+      listGrid.innerHTML = isEmpty
+        ? `<div class="empty-state"><div class="empty-icon">🎮</div><h3>Tu lista está vacía</h3><p>Busca un juego y añádelo a tu lista para empezar</p><button class="btn-primary" id="btn-start-exploring">Explorar juegos</button></div>`
+        : `<div class="no-results">No hay juegos en esta categoría${listSearch ? ` con "${escHtml(listSearch)}"` : ''}.</div>`;
+      document.getElementById('btn-start-exploring')?.addEventListener('click', () => {
+        history.pushState({}, '', '/'); resetHome();
+      });
+      return;
+    }
     filtered.forEach(e => listGrid.appendChild(renderCard(e, () => openModal(e.steam_appid))));
   }
 
@@ -619,8 +656,20 @@ async function loadMyList() {
 
 function renderAlerts(alerts) {
   const el = document.getElementById('alerts-list');
-  if (!alerts.length) { el.innerHTML = '<p style="color:var(--muted)">No tienes alertas de precio activas.</p>'; return; }
-  el.innerHTML = alerts.map(a => `
+  const active = alerts.filter(a => !a.triggered);
+  const isPremium = AUTH.user?.is_premium;
+  const limitBar = !isPremium ? `
+    <div style="margin-bottom:12px;padding:10px 14px;background:var(--surface2);border-radius:8px;display:flex;align-items:center;justify-content:space-between;gap:12px">
+      <div style="flex:1">
+        <div style="font-size:0.82rem;color:var(--muted2);margin-bottom:6px">Alertas usadas: ${active.length}/3</div>
+        <div style="height:4px;background:var(--border);border-radius:2px">
+          <div style="height:4px;background:${active.length >= 3 ? '#ef4444' : 'var(--purple)'};border-radius:2px;width:${Math.min(active.length/3*100,100)}%"></div>
+        </div>
+      </div>
+      ${active.length >= 3 ? `<button class="btn-follow" onclick="showPremiumModal()" style="font-size:0.8rem">⭐ Premium</button>` : ''}
+    </div>` : '';
+  if (!alerts.length) { el.innerHTML = limitBar + '<p style="color:var(--muted)">No tienes alertas de precio activas.</p>'; return; }
+  el.innerHTML = limitBar + alerts.map(a => `
     <div class="alert-row ${a.triggered ? 'alert-triggered' : ''}">
       <img src="${a.game_image || ''}" class="alert-thumb" onerror="this.style.display='none'" />
       <div class="alert-info">
@@ -834,7 +883,9 @@ async function loadProfile(username) {
         <div class="stat-box"><div class="stat-num">${stats.playing}</div><div class="stat-label">Jugando</div></div>
         <div class="stat-box"><div class="stat-num">${stats.wishlist}</div><div class="stat-label">Deseados</div></div>
         ${stats.avg_rating ? `<div class="stat-box"><div class="stat-num">${stats.avg_rating}</div><div class="stat-label">Nota media</div></div>` : ''}
+        ${stats.total_playtime > 0 ? `<div class="stat-box"><div class="stat-num">${Math.round(stats.total_playtime/60)}h</div><div class="stat-label">En Steam</div></div>` : ''}
       </div>
+      ${stats.best_game ? `<div class="profile-best"><span style="color:var(--muted);font-size:0.85rem">Mejor valorado:</span> <strong>${escHtml(stats.best_game)}</strong> <span class="game-rating" style="font-size:0.8rem">${stats.best_rating}/10</span></div>` : ''}
     `;
 
     const followBtn = document.getElementById('btn-follow-profile');
@@ -870,6 +921,72 @@ async function loadProfile(username) {
     });
     renderProfileList();
   } catch { header.innerHTML = '<div class="no-results">Usuario no encontrado.</div>'; }
+}
+
+// ── Steam import ──────────────────────────────────────
+const steamOverlay = document.getElementById('steam-overlay');
+document.getElementById('steam-close').addEventListener('click', () => steamOverlay.classList.remove('open'));
+steamOverlay.addEventListener('click', e => { if (e.target === steamOverlay) steamOverlay.classList.remove('open'); });
+
+async function openSteamImport(steamId) {
+  const content = document.getElementById('steam-content');
+  steamOverlay.classList.add('open');
+  content.innerHTML = '<div class="loading"><div class="spinner"></div><p style="margin-top:12px;color:var(--muted)">Conectando con Steam...</p></div>';
+
+  try {
+    const preview = await AUTH.apiFetch(`/api/steam/preview?steam_id=${encodeURIComponent(steamId)}`);
+    const played = preview.games.filter(g => g.playtime > 0).length;
+    const topGames = preview.games.slice(0, 5);
+
+    content.innerHTML = `
+      <p style="color:var(--muted);margin-bottom:16px;font-size:0.9rem">Encontrados <strong style="color:var(--text)">${preview.total} juegos</strong> en tu biblioteca</p>
+      <div style="margin-bottom:16px;background:var(--surface2);border-radius:10px;padding:12px;font-size:0.85rem">
+        <div style="color:var(--muted2);margin-bottom:8px">Top juegos por horas:</div>
+        ${topGames.map(g => `
+          <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)">
+            <span>${escHtml(g.name)}</span>
+            <span style="color:var(--cyan)">${Math.round(g.playtime/60)}h</span>
+          </div>`).join('')}
+      </div>
+      <div style="margin-bottom:16px">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:10px">
+          <input type="radio" name="import-mode" value="played" checked />
+          <span>Solo jugados (${played} juegos con tiempo de juego)</span>
+        </label>
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+          <input type="radio" name="import-mode" value="all" />
+          <span>Toda la biblioteca (${preview.total} juegos)</span>
+        </label>
+      </div>
+      <button class="btn-primary w-full" id="btn-confirm-import">Importar juegos</button>
+      <p style="color:var(--muted);font-size:0.75rem;margin-top:10px;text-align:center">Los juegos ya en tu lista no se sobreescriben (solo se actualiza el tiempo de juego)</p>
+    `;
+
+    document.getElementById('btn-confirm-import').addEventListener('click', async () => {
+      const onlyPlayed = document.querySelector('input[name="import-mode"]:checked').value === 'played';
+      const btn = document.getElementById('btn-confirm-import');
+      btn.disabled = true; btn.textContent = 'Importando...';
+      try {
+        const result = await AUTH.apiFetch('/api/steam/import', {
+          method: 'POST',
+          body: JSON.stringify({ steam_id: preview.steam_id, games: preview.games, only_played: onlyPlayed })
+        });
+        steamOverlay.classList.remove('open');
+        showToast(`🎮 ${result.imported} juegos importados desde Steam`);
+        followingLoaded = false;
+        if (document.getElementById('view-mylist').style.display !== 'none') loadMyList();
+      } catch (e) {
+        showToast('Error al importar: ' + e.message);
+        btn.disabled = false; btn.textContent = 'Importar juegos';
+      }
+    });
+  } catch(e) {
+    content.innerHTML = `
+      <div style="text-align:center;padding:20px 0">
+        <p style="color:#ef4444;margin-bottom:12px">${escHtml(e.message)}</p>
+        <p style="color:var(--muted);font-size:0.85rem">Asegúrate de que tu perfil de Steam es público:<br>Steam → Perfil → Editar → Privacidad → Público</p>
+      </div>`;
+  }
 }
 
 // ── Premium ───────────────────────────────────────────

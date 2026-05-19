@@ -761,13 +761,12 @@ def steam_import(body: SteamImportIn, user=Depends(require_auth)):
             playtime = g.get("playtime", 0)
             if body.only_played and playtime == 0:
                 continue
-            status = "played" if playtime >= 60 else ("playing" if playtime > 0 else "wishlist")
             image = f"{CDN}/{g['appid']}/header.jpg"
             db.execute("""
                 INSERT INTO game_entries (user_id, steam_appid, game_name, game_image, status, playtime)
                 VALUES (?,?,?,?,?,?)
                 ON CONFLICT(user_id, steam_appid) DO UPDATE SET playtime=excluded.playtime
-            """, (user["id"], g["appid"], g["name"], image, status, playtime))
+            """, (user["id"], g["appid"], g["name"], image, "library", playtime))
             imported += 1
         db.commit()
     finally:

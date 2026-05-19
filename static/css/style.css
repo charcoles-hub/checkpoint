@@ -612,8 +612,18 @@ body {
 .feed-user { margin-bottom: 4px; }
 .feed-username { font-weight: 600; color: var(--purple); cursor: pointer; font-size: 0.9rem; }
 .feed-username:hover { text-decoration: underline; }
-.feed-game { font-weight: 500; font-size: 0.95rem; }
-.feed-notes { color: var(--muted); font-size: 0.82rem; font-style: italic; margin-top: 4px; }
+.feed-action { font-size: 0.8rem; font-weight: 500; margin: 0 4px; }
+.feed-time { font-size: 0.78rem; color: var(--muted); }
+.fa-review   { color: var(--cyan); }
+.fa-rated    { color: #facc15; }
+.fa-played   { color: var(--cyan); }
+.fa-playing  { color: #4ade80; }
+.fa-abandoned{ color: #f87171; }
+.fa-wishlist { color: var(--purple); }
+.fa-library  { color: var(--muted); }
+.feed-game { font-weight: 500; font-size: 0.95rem; margin-top: 2px; }
+.feed-notes  { color: var(--muted); font-size: 0.82rem; font-style: italic; margin-top: 4px; }
+.feed-review { color: var(--muted2); font-size: 0.82rem; margin-top: 4px; }
 
 .premium-features { text-align:left; margin-bottom:8px; }
 .premium-feature {

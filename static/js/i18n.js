@@ -92,6 +92,15 @@ const STRINGS = {
     'status.playing': 'Jugando',
     'status.wishlist': 'Deseado',
     'status.abandoned': 'Abandonado',
+    'status.library': 'En biblioteca',
+
+    'feed.action.reviewed':  'reseñó',
+    'feed.action.rated':     'valoró {n}/10',
+    'feed.action.played':    'terminó',
+    'feed.action.playing':   'está jugando',
+    'feed.action.abandoned': 'abandonó',
+    'feed.action.wishlist':  'quiere jugar',
+    'feed.action.library':   'importó desde Steam',
 
     'stats.total': 'Total juegos',
     'stats.avg_rating': 'Media',
@@ -341,6 +350,15 @@ const STRINGS = {
     'status.playing': 'Playing',
     'status.wishlist': 'Wishlist',
     'status.abandoned': 'Abandoned',
+    'status.library': 'In library',
+
+    'feed.action.reviewed':  'reviewed',
+    'feed.action.rated':     'rated {n}/10',
+    'feed.action.played':    'finished',
+    'feed.action.playing':   'is playing',
+    'feed.action.abandoned': 'abandoned',
+    'feed.action.wishlist':  'wants to play',
+    'feed.action.library':   'imported from Steam',
 
     'stats.total': 'Total games',
     'stats.avg_rating': 'Avg. rating',

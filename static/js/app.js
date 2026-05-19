@@ -195,7 +195,7 @@ function renderCard(game, onClick, onDelete) {
       <div class="game-card-meta">
         ${game.rating != null ? `<span class="game-rating">${game.rating}/10</span>` : ''}
         ${game.avg_rating ? `<span class="game-rating community-rating" title="${game.votes} votos">★ ${game.avg_rating}</span>` : ''}
-        ${game.status ? `<span class="status-badge status-${game.status}">${statusLabel[game.status]}</span>` : ''}
+        ${game.status && game.status !== 'library' ? `<span class="status-badge status-${game.status}">${statusLabel[game.status]}</span>` : ''}
         ${game.price ? `<span class="game-year" style="color:var(--cyan)">${game.price}</span>` : ''}
         ${game.playtime > 0 ? `<span class="game-year" style="color:var(--muted)">${Math.round(game.playtime/60)}h</span>` : ''}
       </div>
@@ -531,7 +531,7 @@ async function openModal(gameId) {
       ${myEntry ? `
       <div class="my-entry-box">
         <div class="my-entry-header">
-          <span class="status-badge status-${myEntry.status}">${{played:t('status.played'),playing:t('status.playing'),wishlist:t('status.wishlist')}[myEntry.status]}</span>
+          <span class="status-badge status-${myEntry.status}">${{played:t('status.played'),playing:t('status.playing'),wishlist:t('status.wishlist'),abandoned:t('status.abandoned'),library:t('status.library')}[myEntry.status]}</span>
           ${myEntry.rating ? `<span class="game-rating">${myEntry.rating}/10</span>` : ''}
           <button class="btn-ghost" id="btn-remove-game" style="margin-left:auto;padding:4px 10px;font-size:0.8rem;color:var(--muted)">${t('modal.btn_remove')}</button>
         </div>
@@ -999,6 +999,46 @@ function renderAlerts(alerts) {
   });
 }
 
+// ── Feed helpers ─────────────────────────────────────
+function _feedAction(e) {
+  if (e.review)            return { text: t('feed.action.reviewed'),           cls: 'fa-review' };
+  if (e.rating)            return { text: t('feed.action.rated', {n: e.rating}), cls: 'fa-rated' };
+  const map = {
+    played:    { text: t('feed.action.played'),    cls: 'fa-played' },
+    playing:   { text: t('feed.action.playing'),   cls: 'fa-playing' },
+    abandoned: { text: t('feed.action.abandoned'), cls: 'fa-abandoned' },
+    wishlist:  { text: t('feed.action.wishlist'),  cls: 'fa-wishlist' },
+    library:   { text: t('feed.action.library'),   cls: 'fa-library' },
+  };
+  return map[e.status] || { text: '', cls: '' };
+}
+
+function renderFeedItem(e) {
+  const item = document.createElement('div');
+  item.className = 'feed-item';
+  const act = _feedAction(e);
+  item.innerHTML = `
+    <img src="${e.game_image || ''}" class="feed-thumb" onerror="this.style.display='none'" />
+    <div class="feed-info">
+      <div class="feed-user">
+        <span class="feed-username" data-u="${escHtml(e.player)}">${escHtml(e.player)}</span>
+        ${act.text ? `<span class="feed-action ${act.cls}">${act.text}</span>` : ''}
+        <span class="feed-time">${timeAgo(e.added_at)}</span>
+      </div>
+      <div class="feed-game">${escHtml(e.game_name)}</div>
+      ${e.review ? `<div class="feed-review">"${escHtml(e.review.slice(0, 120))}${e.review.length > 120 ? '…' : ''}"</div>` :
+        e.notes ? `<div class="feed-notes">"${escHtml(e.notes.slice(0, 80))}${e.notes.length > 80 ? '…' : ''}"</div>` : ''}
+    </div>
+  `;
+  item.querySelector('.feed-username').addEventListener('click', () => {
+    history.pushState({}, '', `/u/${e.player}`); showView('profile'); loadProfile(e.player);
+  });
+  item.addEventListener('click', ev => {
+    if (!ev.target.classList.contains('feed-username')) openModal(e.steam_appid);
+  });
+  return item;
+}
+
 // ── Following section ─────────────────────────────────
 let followingLoaded = false;
 
@@ -1046,34 +1086,7 @@ async function loadFollowingSection() {
     feedEl.innerHTML = `<p style="color:var(--muted)">${t('following.feed_empty')}</p>`;
   } else {
     feedEl.innerHTML = `<h4 style="margin:24px 0 12px;color:var(--muted2);font-size:0.9rem;text-transform:uppercase;letter-spacing:.05em">${t('following.activity')}</h4>`;
-    const statusLabel = { played: t('status.played'), playing: t('status.playing'), wishlist: t('status.wishlist'), abandoned: t('status.abandoned') };
-    const statusColor = { played: 'var(--purple)', playing: 'var(--cyan)', wishlist: 'var(--muted2)' };
-    feed.forEach(e => {
-      const item = document.createElement('div');
-      item.className = 'feed-item';
-      item.innerHTML = `
-        <img src="${e.game_image || ''}" class="feed-thumb" onerror="this.style.display='none'" />
-        <div class="feed-info">
-          <div class="feed-user">
-            <span class="feed-username" data-u="${e.player}">${e.player}</span>
-            <span style="color:var(--muted);font-size:0.82rem"> · ${timeAgo(e.added_at)}</span>
-          </div>
-          <div class="feed-game">${e.game_name}</div>
-          <div style="display:flex;gap:8px;align-items:center;margin-top:4px">
-            <span style="font-size:0.8rem;color:${statusColor[e.status]}">${statusLabel[e.status]}</span>
-            ${e.rating ? `<span class="game-rating" style="font-size:0.8rem">${e.rating}/10</span>` : ''}
-          </div>
-          ${e.notes ? `<div class="feed-notes">"${escHtml(e.notes.slice(0, 80))}${e.notes.length > 80 ? '…' : ''}"</div>` : ''}
-        </div>
-      `;
-      item.querySelector('.feed-username').addEventListener('click', () => {
-        history.pushState({}, '', `/u/${e.player}`); showView('profile'); loadProfile(e.player);
-      });
-      item.addEventListener('click', (ev) => {
-        if (!ev.target.classList.contains('feed-username')) openModal(e.steam_appid);
-      });
-      feedEl.appendChild(item);
-    });
+    feed.forEach(e => feedEl.appendChild(renderFeedItem(e)));
   }
 
   // User search
@@ -1336,34 +1349,7 @@ async function loadCommunity() {
     feedEl.innerHTML = `<p style="color:var(--muted);margin-top:16px">${t('following.feed_empty')}</p>`;
   } else {
     feedEl.innerHTML = `<h4 style="margin:24px 0 12px;color:var(--muted2);font-size:0.9rem;text-transform:uppercase;letter-spacing:.05em">${t('following.activity')}</h4>`;
-    const statusColor = { played: 'var(--purple)', playing: 'var(--cyan)', wishlist: 'var(--muted2)' };
-    const statusLabel = { played: t('status.played'), playing: t('status.playing'), wishlist: t('status.wishlist'), abandoned: t('status.abandoned') };
-    feed.forEach(e => {
-      const item = document.createElement('div');
-      item.className = 'feed-item';
-      item.innerHTML = `
-        <img src="${e.game_image || ''}" class="feed-thumb" onerror="this.style.display='none'" />
-        <div class="feed-info">
-          <div class="feed-user">
-            <span class="feed-username" data-u="${e.player}">${e.player}</span>
-            <span style="color:var(--muted);font-size:0.82rem"> · ${timeAgo(e.added_at)}</span>
-          </div>
-          <div class="feed-game">${e.game_name}</div>
-          <div style="display:flex;gap:8px;align-items:center;margin-top:4px">
-            <span style="font-size:0.8rem;color:${statusColor[e.status]}">${statusLabel[e.status]}</span>
-            ${e.rating ? `<span class="game-rating" style="font-size:0.8rem">${e.rating}/10</span>` : ''}
-          </div>
-          ${e.notes ? `<div class="feed-notes">"${escHtml(e.notes.slice(0, 80))}${e.notes.length > 80 ? '…' : ''}"</div>` : ''}
-        </div>
-      `;
-      item.querySelector('.feed-username').addEventListener('click', () => {
-        history.pushState({}, '', `/u/${e.player}`); showView('profile'); loadProfile(e.player);
-      });
-      item.addEventListener('click', ev => {
-        if (!ev.target.classList.contains('feed-username')) openModal(e.steam_appid);
-      });
-      feedEl.appendChild(item);
-    });
+    feed.forEach(e => feedEl.appendChild(renderFeedItem(e)));
   }
 }
 

@@ -19,7 +19,7 @@ let totalGames = 0;
 let genreCache = null;
 
 // ── Views ────────────────────────────────────────────
-const VIEWS = ['home', 'profile-me', 'ranking', 'profile', 'explore', 'community', 'ideas'];
+const VIEWS = ['home', 'profile-me', 'ranking', 'profile', 'explore', 'community', 'ideas', 'contacto'];
 
 function showView(name) {
   VIEWS.forEach(v => {
@@ -50,6 +50,7 @@ document.getElementById('nav-ranking').addEventListener('click', () => { history
 document.getElementById('nav-explore').addEventListener('click', () => { history.pushState({}, '', '/explore'); showView('explore'); loadExplore(); closeMenu(); });
 document.getElementById('nav-community').addEventListener('click', () => { history.pushState({}, '', '/community'); showView('community'); loadCommunity(); closeMenu(); });
 document.getElementById('nav-ideas').addEventListener('click', () => { history.pushState({}, '', '/ideas'); showView('ideas'); loadIdeas(); closeMenu(); });
+document.getElementById('footer-contact').addEventListener('click', () => { history.pushState({}, '', '/contacto'); showView('contacto'); });
 
 function resetHome() {
   currentPage = 1; currentSearch = ''; currentGenre = ''; currentPlatform = ''; currentSort = 'popular';
@@ -111,6 +112,7 @@ function route() {
   else if (path.startsWith('/u/')) { showView('profile'); loadProfile(path.slice(3)); }
   else if (path === '/community') { showView('community'); loadCommunity(); }
   else if (path === '/ideas') { showView('ideas'); loadIdeas(); }
+  else if (path === '/contacto') { showView('contacto'); }
   else { showView('home'); loadGames(); initGenrePills(); }
 }
 
@@ -725,12 +727,29 @@ function switchProfileTab(tab) {
 function loadMyAccount() {
   const el = document.getElementById('account-content');
   const profileUrl = `${location.origin}/u/${AUTH.user.username}`;
+
+  // Cooldown: check if username was changed less than 7 days ago
+  const changedAt = AUTH.user.username_changed_at ? new Date(AUTH.user.username_changed_at) : null;
+  const cooldownMs = 7 * 24 * 60 * 60 * 1000;
+  const now = Date.now();
+  const inCooldown = changedAt && (now - changedAt.getTime()) < cooldownMs;
+  const nextChangeDate = inCooldown ? new Date(changedAt.getTime() + cooldownMs) : null;
+  const nextDateStr = nextChangeDate
+    ? nextChangeDate.toLocaleDateString(t('time.locale'), { day: '2-digit', month: '2-digit', year: 'numeric' })
+    : null;
+  const usernameHint = inCooldown
+    ? `<span style="color:var(--muted2);font-size:0.78rem">${t('profile_me.username_cooldown', { date: nextDateStr })}</span>`
+    : `<span style="color:var(--muted2);font-size:0.78rem">${t('profile_me.username_hint')}</span>`;
+
   el.innerHTML = `
     <div style="max-width:480px">
       <p style="font-size:0.78rem;color:var(--muted2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:20px">${t('profile_me.section_edit')}</p>
 
-      <label style="font-size:0.85rem;color:var(--muted);display:block;margin-bottom:6px">${t('profile_me.label_username')}</label>
-      <input type="text" id="account-username" class="field-input" value="${escHtml(AUTH.user.username)}" maxlength="30" style="margin-bottom:16px" />
+      <label style="font-size:0.85rem;color:var(--muted);display:block;margin-bottom:6px">
+        ${t('profile_me.label_username')}
+        <span style="margin-left:6px">${usernameHint}</span>
+      </label>
+      <input type="text" id="account-username" class="field-input" value="${escHtml(AUTH.user.username)}" maxlength="30" style="margin-bottom:16px" ${inCooldown ? 'disabled' : ''} />
 
       <label style="font-size:0.85rem;color:var(--muted);display:block;margin-bottom:6px">
         ${t('profile_me.label_bio')}
@@ -767,6 +786,7 @@ function loadMyAccount() {
       const updated = await AUTH.apiFetch('/api/auth/profile', { method: 'PATCH', body: JSON.stringify({ username, bio }) });
       AUTH.user.username = updated.username;
       AUTH.user.bio = updated.bio;
+      AUTH.user.username_changed_at = updated.username_changed_at;
       localStorage.setItem('gl_user', JSON.stringify(AUTH.user));
       AUTH.updateUI();
       document.getElementById('profile-me-avatar').textContent = AUTH.user.username[0].toUpperCase();

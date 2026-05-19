@@ -4,7 +4,7 @@ import re
 import secrets
 import stripe
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import FastAPI, Depends, HTTPException, Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -197,7 +197,7 @@ def register(request: Request, body: RegisterIn):
     if len(body.password) < 6:
         raise HTTPException(400, "La contraseña debe tener al menos 6 caracteres")
     db = get_db()
-    if db.execute("SELECT id FROM users WHERE email=? OR username=?", (body.email, body.username)).fetchone():
+    if db.execute("SELECT id FROM users WHERE email=? OR LOWER(username)=LOWER(?)", (body.email, body.username)).fetchone():
         db.close(); raise HTTPException(400, "Email o usuario ya en uso")
     db.execute("INSERT INTO users (username, email, password_hash) VALUES (?,?,?)",
                (body.username, body.email, hash_pw(body.password)))
@@ -290,14 +290,24 @@ class ProfileIn(BaseModel):
 @limiter.limit("10/minute")
 def update_profile(request: Request, body: ProfileIn, user=Depends(require_auth)):
     db = get_db()
-    if body.username != user["username"]:
-        existing = db.execute("SELECT id FROM users WHERE username=? AND id!=?", (body.username, user["id"])).fetchone()
+    username_changing = body.username != user["username"]
+    if username_changing:
+        existing = db.execute("SELECT id FROM users WHERE LOWER(username)=LOWER(?) AND id!=?", (body.username, user["id"])).fetchone()
         if existing:
             db.close()
             raise HTTPException(409, "Ese nombre de usuario ya está en uso")
-    db.execute("UPDATE users SET username=?, bio=? WHERE id=?", (body.username, body.bio, user["id"]))
+        changed_at = _parse_dt(user.get("username_changed_at"))
+        if changed_at and (datetime.now(timezone.utc) - changed_at) < timedelta(days=7):
+            next_change = changed_at + timedelta(days=7)
+            db.close()
+            raise HTTPException(429, f"Puedes cambiar tu nombre de nuevo el {next_change.strftime('%d/%m/%Y')}")
+    if username_changing:
+        db.execute("UPDATE users SET username=?, bio=?, username_changed_at=CURRENT_TIMESTAMP WHERE id=?", (body.username, body.bio, user["id"]))
+    else:
+        db.execute("UPDATE users SET bio=? WHERE id=?", (body.bio, user["id"]))
     db.commit(); db.close()
-    return _pub({**user, "username": body.username, "bio": body.bio})
+    changed_at_new = datetime.now(timezone.utc).isoformat() if username_changing else _dt_str(user.get("username_changed_at"))
+    return _pub({**user, "username": body.username, "bio": body.bio, "username_changed_at": changed_at_new})
 
 @app.patch("/api/auth/settings")
 def update_settings(body: dict, user=Depends(require_auth)):
@@ -311,7 +321,26 @@ def update_settings(body: dict, user=Depends(require_auth)):
     return {"ok": True}
 
 
-def _pub(u): return {"id": u["id"], "username": u["username"], "email": u["email"], "notify_ntfy": u.get("notify_ntfy"), "is_premium": bool(u.get("is_premium", 0)), "steam_id": u.get("steam_id"), "bio": u.get("bio") or ""}
+def _pub(u): return {"id": u["id"], "username": u["username"], "email": u["email"], "notify_ntfy": u.get("notify_ntfy"), "is_premium": bool(u.get("is_premium", 0)), "steam_id": u.get("steam_id"), "bio": u.get("bio") or "", "username_changed_at": _dt_str(u.get("username_changed_at"))}
+
+
+def _parse_dt(val):
+    if val is None:
+        return None
+    if isinstance(val, datetime):
+        return val.replace(tzinfo=timezone.utc) if val.tzinfo is None else val
+    try:
+        return datetime.fromisoformat(str(val)).replace(tzinfo=timezone.utc)
+    except Exception:
+        return None
+
+
+def _dt_str(val):
+    if val is None:
+        return None
+    if isinstance(val, datetime):
+        return val.isoformat()
+    return str(val)
 
 
 def _unique_username(db, base: str) -> str:

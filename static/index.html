@@ -44,6 +44,23 @@
 </nav>
 
 <main>
+  <!-- CONTACT VIEW -->
+  <div id="view-contacto" style="display:none">
+    <section class="games-section" style="padding-top:100px;min-height:60vh;display:flex;align-items:center;justify-content:center">
+      <div style="max-width:480px;width:100%;text-align:center">
+        <div style="font-size:3rem;margin-bottom:20px">🎮</div>
+        <h2 style="font-size:1.8rem;font-weight:800;margin-bottom:12px" data-i18n="contact.title">Contacto</h2>
+        <p style="color:var(--muted);font-size:1rem;line-height:1.6;margin-bottom:36px" data-i18n="contact.desc">¿Tienes preguntas, ideas o simplemente quieres saludar? Encuéntrame en Twitch.</p>
+        <a href="https://www.twitch.tv/adeptus_noctus" target="_blank" rel="noopener noreferrer"
+           style="display:inline-flex;align-items:center;gap:10px;background:#9146ff;color:#fff;font-weight:700;font-size:1rem;padding:14px 28px;border-radius:10px;text-decoration:none;transition:opacity .15s"
+           onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/></svg>
+          <span data-i18n="contact.twitch_btn">Visitar canal de Twitch</span>
+        </a>
+      </div>
+    </section>
+  </div>
+
   <!-- IDEAS VIEW -->
   <div id="view-ideas" style="display:none">
     <section class="games-section" style="padding-top:100px">
@@ -367,6 +384,10 @@
     </div>
   </div>
 </div>
+
+<footer style="text-align:center;padding:24px 16px;border-top:1px solid var(--border);margin-top:40px">
+  <button id="footer-contact" class="btn-ghost" style="font-size:0.82rem;color:var(--muted2);padding:4px 10px" data-i18n="contact.footer_link">Contacto</button>
+</footer>
 
 <script src="/js/i18n.js"></script>
 <script src="/js/auth.js"></script>

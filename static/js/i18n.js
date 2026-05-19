@@ -18,6 +18,8 @@ const STRINGS = {
     'profile_me.btn_save': 'Guardar cambios',
     'profile_me.btn_saving': 'Guardando...',
     'profile_me.saved': 'Perfil actualizado',
+    'profile_me.username_hint': 'Puedes cambiar tu nombre una vez cada 7 días',
+    'profile_me.username_cooldown': 'Próximo cambio disponible: {date}',
     'nav.settings': 'Notificaciones',
     'nav.premium_menu': '⭐ Premium',
     'nav.manage_subscription': '⭐ Gestionar suscripción',
@@ -283,6 +285,11 @@ const STRINGS = {
     'time.hours': 'hace {n}h',
     'time.days': 'hace {n}d',
     'time.locale': 'es-ES',
+
+    'contact.title': 'Contacto',
+    'contact.desc': '¿Tienes preguntas, ideas o simplemente quieres saludar? Encuéntrame en Twitch.',
+    'contact.twitch_btn': 'Visitar canal de Twitch',
+    'contact.footer_link': 'Contacto',
   },
 
   en: {
@@ -302,6 +309,8 @@ const STRINGS = {
     'profile_me.btn_save': 'Save changes',
     'profile_me.btn_saving': 'Saving...',
     'profile_me.saved': 'Profile updated',
+    'profile_me.username_hint': 'You can change your username once every 7 days',
+    'profile_me.username_cooldown': 'Next change available: {date}',
     'nav.settings': 'Settings',
     'nav.premium_menu': '⭐ Premium',
     'nav.manage_subscription': '⭐ Manage subscription',
@@ -567,6 +576,11 @@ const STRINGS = {
     'time.hours': '{n}h ago',
     'time.days': '{n}d ago',
     'time.locale': 'en-US',
+
+    'contact.title': 'Contact',
+    'contact.desc': 'Got questions, ideas, or just want to say hi? Find me on Twitch.',
+    'contact.twitch_btn': 'Visit Twitch channel',
+    'contact.footer_link': 'Contact',
   }
 };
 
@@ -595,10 +609,15 @@ const ERROR_MAP = {
   'Pagos no configurados': 'Payments not configured',
   'Ya eres premium': 'You are already premium',
   'No tienes suscripción activa': 'No active subscription',
+  'Ese nombre de usuario ya está en uso': 'That username is already taken',
 };
 
 function translateError(msg) {
   if (LANG === 'es') return msg;
+  if (msg && msg.startsWith('Puedes cambiar tu nombre de nuevo el ')) {
+    const date = msg.replace('Puedes cambiar tu nombre de nuevo el ', '');
+    return `Next name change available on ${date}`;
+  }
   return ERROR_MAP[msg] || msg;
 }
 

@@ -107,10 +107,12 @@ def raw_price(po):
     return po["final"] / 100
 
 def fmt_spy_price(g):
-    price = g.get("price")
-    if price is None: return None
+    try:
+        price = int(g.get("price") or 0)
+    except (ValueError, TypeError):
+        return None
     if price == 0: return "Gratis"
-    disc = g.get("discount", 0)
+    disc = int(g.get("discount") or 0)
     formatted = f"{price / 100:.2f}€"
     return f"-{disc}% {formatted}" if disc else formatted
 

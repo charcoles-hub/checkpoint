@@ -141,6 +141,7 @@
           <button class="list-tab" data-status="played" data-i18n="tab.played">Jugados</button>
           <button class="list-tab" data-status="playing" data-i18n="tab.playing">Jugando</button>
           <button class="list-tab" data-status="wishlist" data-i18n="tab.wishlist">Deseados</button>
+          <button class="list-tab" data-status="abandoned" data-i18n="tab.abandoned">Abandonados</button>
         </div>
       </div>
       <div class="games-grid" id="profile-grid"></div>
@@ -164,6 +165,7 @@
       <div class="list-tabs" id="profile-me-tabs" style="margin-bottom:28px">
         <button class="list-tab active" data-tab="mygames" data-i18n="nav.mylist">Mis juegos</button>
         <button class="list-tab" data-tab="wishlist" data-i18n="nav.wishlist">Deseados</button>
+        <button class="list-tab" data-tab="stats" data-i18n="profile_me.tab_stats">Estadísticas</button>
         <button class="list-tab" data-tab="account" data-i18n="profile_me.tab_account">Mi cuenta</button>
       </div>
 
@@ -173,6 +175,7 @@
           <button class="list-tab active" data-status="all" data-i18n="tab.all">Todos</button>
           <button class="list-tab" data-status="played" data-i18n="tab.played">Jugados</button>
           <button class="list-tab" data-status="playing" data-i18n="tab.playing">Jugando</button>
+          <button class="list-tab" data-status="abandoned" data-i18n="tab.abandoned">Abandonados</button>
         </div>
         <div class="games-grid" id="mylist-grid"></div>
       </div>
@@ -184,6 +187,11 @@
           <h3 style="margin:32px 0 16px;font-size:1.1rem" data-i18n="alerts.title">Alertas de precio</h3>
           <div id="alerts-list"></div>
         </div>
+      </div>
+
+      <!-- Panel: Estadísticas -->
+      <div id="panel-stats" style="display:none">
+        <div id="stats-content"></div>
       </div>
 
       <!-- Panel: Mi cuenta -->

@@ -72,6 +72,7 @@ const STRINGS = {
     'tab.played': 'Jugados',
     'tab.playing': 'Jugando',
     'tab.wishlist': 'Deseados',
+    'tab.abandoned': 'Abandonados',
     'tab.following': 'Siguiendo',
 
     'mylist.title': 'Mis juegos',
@@ -90,6 +91,14 @@ const STRINGS = {
     'status.played': 'Jugado',
     'status.playing': 'Jugando',
     'status.wishlist': 'Deseado',
+    'status.abandoned': 'Abandonado',
+
+    'stats.total': 'Total juegos',
+    'stats.avg_rating': 'Media',
+    'stats.by_status': 'Estado de tu colección',
+    'stats.ratings_dist': 'Distribución de valoraciones',
+    'stats.monthly': 'Actividad mensual (últimos 12 meses)',
+    'stats.top_playtime': 'Tus más jugados (Steam)',
 
     'alerts.title': 'Alertas de precio',
     'alerts.empty': 'No tienes alertas de precio activas.',
@@ -119,6 +128,7 @@ const STRINGS = {
     'btn.next': 'Siguiente →',
 
     'modal.achievements': '🏆 Logros',
+    'modal.btn_abandoned': '✕ Abandonado',
     'modal.btn_played': '✓ Jugado',
     'modal.btn_playing': '▶ Jugando',
     'modal.btn_wishlist': '♡ Deseos',
@@ -221,6 +231,8 @@ const STRINGS = {
     'toast.steam_imported': '🎮 {n} juegos importados desde Steam',
     'toast.invalid_price': 'Introduce un precio válido',
     'toast.game_removed': 'Juego eliminado de tu lista',
+    'toast.abandoned': '✕ Añadido a abandonados',
+    'profile_me.tab_stats': 'Estadísticas',
 
     'community.title': 'Comunidad',
     'community.subtitle': 'Descubre otros jugadores y sigue su actividad',
@@ -309,6 +321,7 @@ const STRINGS = {
     'tab.played': 'Played',
     'tab.playing': 'Playing',
     'tab.wishlist': 'Wishlist',
+    'tab.abandoned': 'Abandoned',
     'tab.following': 'Following',
 
     'mylist.title': 'My games',
@@ -327,6 +340,14 @@ const STRINGS = {
     'status.played': 'Played',
     'status.playing': 'Playing',
     'status.wishlist': 'Wishlist',
+    'status.abandoned': 'Abandoned',
+
+    'stats.total': 'Total games',
+    'stats.avg_rating': 'Avg. rating',
+    'stats.by_status': 'Collection by status',
+    'stats.ratings_dist': 'Rating distribution',
+    'stats.monthly': 'Monthly activity (last 12 months)',
+    'stats.top_playtime': 'Most played (Steam)',
 
     'alerts.title': 'Price alerts',
     'alerts.empty': 'No active price alerts.',
@@ -356,6 +377,7 @@ const STRINGS = {
     'btn.next': 'Next →',
 
     'modal.achievements': '🏆 Achievements',
+    'modal.btn_abandoned': '✕ Abandoned',
     'modal.btn_played': '✓ Played',
     'modal.btn_playing': '▶ Playing',
     'modal.btn_wishlist': '♡ Wishlist',
@@ -458,6 +480,8 @@ const STRINGS = {
     'toast.steam_imported': '🎮 {n} games imported from Steam',
     'toast.invalid_price': 'Enter a valid price',
     'toast.game_removed': 'Game removed from your list',
+    'toast.abandoned': '✕ Added to abandoned',
+    'profile_me.tab_stats': 'Stats',
 
     'community.title': 'Community',
     'community.subtitle': 'Discover other players and follow their activity',

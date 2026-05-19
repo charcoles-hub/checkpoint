@@ -296,6 +296,13 @@ body {
   transition: all 0.2s;
 }
 .btn-wishlist:hover { border-color: var(--cyan); color: var(--cyan); }
+.btn-abandoned {
+  background: none; border: 1px solid rgba(239,68,68,0.3); color: #f87171;
+  padding: 11px 24px; border-radius: 10px; cursor: pointer;
+  font-family: inherit; font-size: 0.95rem; font-weight: 500;
+  transition: all 0.2s;
+}
+.btn-abandoned:hover { background: rgba(239,68,68,0.1); border-color: #f87171; }
 
 /* NO RESULTS */
 .no-results {
@@ -401,6 +408,7 @@ body {
 .status-played { background: rgba(34,211,238,0.15); color: var(--cyan); }
 .status-playing { background: rgba(74,222,128,0.15); color: #4ade80; }
 .status-wishlist { background: rgba(139,92,246,0.15); color: var(--purple); }
+.status-abandoned { background: rgba(239,68,68,0.12); color: #f87171; }
 
 /* MY LIST TABS */
 .list-tabs { display: flex; gap: 8px; }
@@ -621,6 +629,35 @@ body {
 .my-entry-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
 .my-entry-notes { color: var(--muted2); font-style: italic; font-size: 0.9rem; margin-bottom: 14px; }
 .draft-section { margin-top: 12px; }
+/* ── Stats ─────────────────────────────────────────── */
+.stats-summary { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 28px; }
+.stats-panel {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 12px; padding: 20px; margin-bottom: 16px;
+}
+.stat-bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.stat-bar-row:last-child { margin-bottom: 0; }
+.stat-bar-label { font-size: 0.85rem; color: var(--muted2); min-width: 90px; }
+.stat-bar-track { flex: 1; background: var(--border); border-radius: 4px; height: 8px; overflow: hidden; }
+.stat-bar-fill { height: 100%; border-radius: 4px; transition: width 0.6s ease; }
+.stat-bar-played    { background: var(--cyan); }
+.stat-bar-playing   { background: #4ade80; }
+.stat-bar-wishlist  { background: var(--purple); }
+.stat-bar-abandoned { background: #f87171; }
+.stat-bar-count { font-size: 0.82rem; color: var(--muted2); min-width: 60px; text-align: right; }
+.stat-bar-pct { color: var(--muted); }
+.rating-hist { display: flex; flex-direction: column; gap: 6px; }
+.rating-hist-row { display: flex; align-items: center; gap: 8px; }
+.rating-hist-label { font-size: 0.82rem; color: var(--muted2); width: 20px; text-align: right; font-weight: 600; }
+.rating-hist-track { flex: 1; background: var(--border); border-radius: 4px; height: 8px; overflow: hidden; }
+.rating-hist-bar { height: 100%; background: var(--purple); border-radius: 4px; transition: width 0.6s ease; }
+.rating-hist-count { font-size: 0.82rem; color: var(--muted); width: 24px; }
+.monthly-chart { display: flex; align-items: flex-end; gap: 6px; height: 100px; padding-top: 8px; }
+.month-col { display: flex; flex-direction: column; align-items: center; flex: 1; height: 100%; }
+.month-bar-wrap { flex: 1; display: flex; align-items: flex-end; width: 100%; }
+.month-bar { width: 100%; background: var(--purple); border-radius: 4px 4px 0 0; min-height: 0; transition: height 0.5s ease; }
+.month-label { font-size: 0.6rem; color: var(--muted); margin-top: 4px; text-transform: uppercase; }
+
 .review-section { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
 #modal-reviews { margin-top: 24px; }
 .modal-section-title {

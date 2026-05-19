@@ -182,7 +182,7 @@ document.querySelectorAll('#sort-tabs .sort-tab').forEach(tab => {
 // ── Game cards ───────────────────────────────────────
 function renderCard(game, onClick, onDelete) {
   const platforms = (game.platforms || []).slice(0, 3);
-  const statusLabel = { played: t('status.played'), playing: t('status.playing'), wishlist: t('status.wishlist') };
+  const statusLabel = { played: t('status.played'), playing: t('status.playing'), wishlist: t('status.wishlist'), abandoned: t('status.abandoned') };
   const name = game.name || game.game_name;
   const image = game.image || game.game_image;
 
@@ -507,6 +507,7 @@ async function openModal(gameId) {
         <button class="btn-add" id="modal-btn-played">${t('modal.btn_played')}</button>
         <button class="btn-add" id="modal-btn-playing" style="background:var(--cyan);color:#000">${t('modal.btn_playing')}</button>
         <button class="btn-wishlist" id="modal-btn-wishlist">${t('modal.btn_wishlist')}</button>
+        <button class="btn-abandoned" id="modal-btn-abandoned">${t('modal.btn_abandoned')}</button>
       </div>
       <div id="rating-form" style="display:none" class="alert-form-box">
         <p class="alert-form-label" style="margin-bottom:14px">${t('modal.rating_label')} <span style="color:var(--muted);font-size:0.8rem">${t('modal.optional')}</span></p>
@@ -569,6 +570,10 @@ async function openModal(gameId) {
     document.getElementById('modal-btn-playing').addEventListener('click', async () => {
       if (!AUTH.user) { AUTH.showModal('login'); return; }
       await saveEntry(g, 'playing'); showToast(t('toast.playing'));
+    });
+    document.getElementById('modal-btn-abandoned').addEventListener('click', async () => {
+      if (!AUTH.user) { AUTH.showModal('login'); return; }
+      await saveEntry(g, 'abandoned'); showToast(t('toast.abandoned'));
     });
     document.getElementById('modal-btn-wishlist').addEventListener('click', async () => {
       if (!AUTH.user) { AUTH.showModal('login'); return; }
@@ -705,11 +710,12 @@ function loadProfileMe() {
 
 function switchProfileTab(tab) {
   profileMeTab = tab;
-  ['mygames', 'wishlist', 'account'].forEach(p => {
+  ['mygames', 'wishlist', 'stats', 'account'].forEach(p => {
     document.getElementById(`panel-${p}`).style.display = p === tab ? '' : 'none';
   });
   if (tab === 'mygames') loadMyList();
   else if (tab === 'wishlist') loadWishlist();
+  else if (tab === 'stats') loadStats();
   else if (tab === 'account') loadMyAccount();
 }
 
@@ -776,6 +782,102 @@ function loadMyAccount() {
   document.getElementById('btn-copy-profile-acc').addEventListener('click', () => {
     navigator.clipboard.writeText(profileUrl); showToast(t('toast.link_copied'));
   });
+}
+
+// ── Stats ────────────────────────────────────────────
+async function loadStats() {
+  const el = document.getElementById('stats-content');
+  el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const s = await AUTH.apiFetch('/api/stats/me');
+    const counts = s.status_counts || {};
+    const total = s.total || 0;
+    const pct = n => total ? Math.round((n || 0) / total * 100) : 0;
+
+    const statusDefs = [
+      { key: 'played',    label: t('status.played'),    cls: 'played' },
+      { key: 'playing',   label: t('status.playing'),   cls: 'playing' },
+      { key: 'wishlist',  label: t('status.wishlist'),  cls: 'wishlist' },
+      { key: 'abandoned', label: t('status.abandoned'), cls: 'abandoned' },
+    ];
+
+    const maxRating = s.rating_histogram.length ? Math.max(...s.rating_histogram.map(r => r.count)) : 1;
+    const maxMonth  = s.monthly.length ? Math.max(...s.monthly.map(m => m.count), 1) : 1;
+
+    const shortMonth = m => {
+      const [y, mo] = m.split('-');
+      return new Date(+y, +mo - 1).toLocaleDateString(t('time.locale'), { month: 'short' });
+    };
+
+    el.innerHTML = `
+      <div class="stats-summary">
+        <div class="stat-box"><div class="stat-num">${total}</div><div class="stat-label">${t('stats.total')}</div></div>
+        <div class="stat-box"><div class="stat-num">${counts.played || 0}</div><div class="stat-label">${t('status.played')}</div></div>
+        <div class="stat-box"><div class="stat-num">${counts.playing || 0}</div><div class="stat-label">${t('status.playing')}</div></div>
+        <div class="stat-box"><div class="stat-num">${counts.wishlist || 0}</div><div class="stat-label">${t('status.wishlist')}</div></div>
+        ${counts.abandoned ? `<div class="stat-box"><div class="stat-num">${counts.abandoned}</div><div class="stat-label">${t('status.abandoned')}</div></div>` : ''}
+        ${s.avg_rating ? `<div class="stat-box"><div class="stat-num">${s.avg_rating}</div><div class="stat-label">${t('stats.avg_rating')}</div></div>` : ''}
+      </div>
+
+      ${total > 0 ? `
+      <div class="stats-panel">
+        <h4 class="stats-section-title">${t('stats.by_status')}</h4>
+        ${statusDefs.map(({key, label, cls}) => counts[key] ? `
+          <div class="stat-bar-row">
+            <span class="stat-bar-label">${label}</span>
+            <div class="stat-bar-track">
+              <div class="stat-bar-fill stat-bar-${cls}" style="width:${pct(counts[key])}%"></div>
+            </div>
+            <span class="stat-bar-count">${counts[key]} <span class="stat-bar-pct">${pct(counts[key])}%</span></span>
+          </div>`
+        : '').join('')}
+      </div>` : ''}
+
+      ${s.rating_histogram.length ? `
+      <div class="stats-panel">
+        <h4 class="stats-section-title">${t('stats.ratings_dist')}</h4>
+        <div class="rating-hist">
+          ${[...s.rating_histogram].reverse().map(({rating, count}) => `
+            <div class="rating-hist-row">
+              <span class="rating-hist-label">${rating}</span>
+              <div class="rating-hist-track">
+                <div class="rating-hist-bar" style="width:${Math.round(count/maxRating*100)}%"></div>
+              </div>
+              <span class="rating-hist-count">${count}</span>
+            </div>`
+          ).join('')}
+        </div>
+      </div>` : ''}
+
+      <div class="stats-panel">
+        <h4 class="stats-section-title">${t('stats.monthly')}</h4>
+        <div class="monthly-chart">
+          ${s.monthly.map(({month, count}) => `
+            <div class="month-col" title="${shortMonth(month)}: ${count}">
+              <div class="month-bar-wrap">
+                <div class="month-bar" style="height:${count ? Math.max(8, Math.round(count/maxMonth*100)) : 0}%"></div>
+              </div>
+              <span class="month-label">${shortMonth(month)}</span>
+            </div>`
+          ).join('')}
+        </div>
+      </div>
+
+      ${s.top_played.length ? `
+      <div class="stats-panel">
+        <h4 class="stats-section-title">${t('stats.top_playtime')}</h4>
+        ${s.top_played.map(({game_name, playtime}) => `
+          <div class="stat-bar-row">
+            <span class="stat-bar-label" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(game_name)}</span>
+            <div class="stat-bar-track">
+              <div class="stat-bar-fill stat-bar-played" style="width:${Math.round(playtime/s.top_played[0].playtime*100)}%"></div>
+            </div>
+            <span class="stat-bar-count">${Math.round(playtime/60)}h</span>
+          </div>`
+        ).join('')}
+      </div>` : ''}
+    `;
+  } catch { el.innerHTML = `<div class="no-results">${t('modal.error')}</div>`; }
 }
 
 // ── My List ──────────────────────────────────────────
@@ -944,7 +1046,7 @@ async function loadFollowingSection() {
     feedEl.innerHTML = `<p style="color:var(--muted)">${t('following.feed_empty')}</p>`;
   } else {
     feedEl.innerHTML = `<h4 style="margin:24px 0 12px;color:var(--muted2);font-size:0.9rem;text-transform:uppercase;letter-spacing:.05em">${t('following.activity')}</h4>`;
-    const statusLabel = { played: t('status.played'), playing: t('status.playing'), wishlist: t('status.wishlist') };
+    const statusLabel = { played: t('status.played'), playing: t('status.playing'), wishlist: t('status.wishlist'), abandoned: t('status.abandoned') };
     const statusColor = { played: 'var(--purple)', playing: 'var(--cyan)', wishlist: 'var(--muted2)' };
     feed.forEach(e => {
       const item = document.createElement('div');
@@ -1089,6 +1191,7 @@ async function loadProfile(username) {
         <div class="stat-box"><div class="stat-num">${stats.played}</div><div class="stat-label">${t('profile.stat.played')}</div></div>
         <div class="stat-box"><div class="stat-num">${stats.playing}</div><div class="stat-label">${t('profile.stat.playing')}</div></div>
         <div class="stat-box"><div class="stat-num">${stats.wishlist}</div><div class="stat-label">${t('profile.stat.wishlist')}</div></div>
+        ${stats.abandoned ? `<div class="stat-box"><div class="stat-num">${stats.abandoned}</div><div class="stat-label">${t('status.abandoned')}</div></div>` : ''}
         ${stats.avg_rating ? `<div class="stat-box"><div class="stat-num">${stats.avg_rating}</div><div class="stat-label">${t('profile.stat.avg')}</div></div>` : ''}
         ${stats.total_playtime > 0 ? `<div class="stat-box"><div class="stat-num">${Math.round(stats.total_playtime/60)}h</div><div class="stat-label">${t('profile.stat.steam')}</div></div>` : ''}
       </div>
@@ -1234,7 +1337,7 @@ async function loadCommunity() {
   } else {
     feedEl.innerHTML = `<h4 style="margin:24px 0 12px;color:var(--muted2);font-size:0.9rem;text-transform:uppercase;letter-spacing:.05em">${t('following.activity')}</h4>`;
     const statusColor = { played: 'var(--purple)', playing: 'var(--cyan)', wishlist: 'var(--muted2)' };
-    const statusLabel = { played: t('status.played'), playing: t('status.playing'), wishlist: t('status.wishlist') };
+    const statusLabel = { played: t('status.played'), playing: t('status.playing'), wishlist: t('status.wishlist'), abandoned: t('status.abandoned') };
     feed.forEach(e => {
       const item = document.createElement('div');
       item.className = 'feed-item';

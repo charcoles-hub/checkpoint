@@ -167,7 +167,7 @@ async def game_detail(game_id: int):
         "id": game_id,
         "name": g.get("name"),
         "description": g.get("short_description", ""),
-        "image": g.get("header_image") or img(game_id),
+        "image": img(game_id),
         "genres": [x["description"] for x in g.get("genres", [])],
         "platforms": [k for k, v in g.get("platforms", {}).items() if v],
         "metacritic": g.get("metacritic", {}).get("score"),
@@ -367,6 +367,7 @@ def public_profile(username: str, user=Depends(current_user)):
         "played": len(played),
         "playing": sum(1 for e in entries if e["status"] == "playing"),
         "wishlist": sum(1 for e in entries if e["status"] == "wishlist"),
+        "abandoned": sum(1 for e in entries if e["status"] == "abandoned"),
         "avg_rating": round(sum(e["rating"] for e in rated) / len(rated), 1) if rated else None,
         "total_playtime": sum(e["playtime"] or 0 for e in entries),
         "best_game": best["game_name"] if best else None,
@@ -529,6 +530,52 @@ def remove_from_list(appid: int, user=Depends(require_auth)):
     db.execute("DELETE FROM game_entries WHERE user_id=? AND steam_appid=?", (user["id"], appid))
     db.commit(); db.close()
     return {"ok": True}
+
+
+@app.get("/api/stats/me")
+def my_stats(user=Depends(require_auth)):
+    db = get_db()
+    rows = db.execute(
+        "SELECT status, rating, added_at, playtime, game_name FROM game_entries WHERE user_id=?",
+        (user["id"],)
+    ).fetchall()
+    entries = [dict(r) for r in rows]
+    db.close()
+
+    rated = [e for e in entries if e.get("rating")]
+
+    rating_hist = {}
+    for e in rated:
+        r = e["rating"]
+        rating_hist[r] = rating_hist.get(r, 0) + 1
+
+    now = datetime.utcnow()
+    months = []
+    for i in range(11, -1, -1):
+        year, month = now.year, now.month - i
+        while month <= 0:
+            month += 12; year -= 1
+        month_str = f"{year:04d}-{month:02d}"
+        count = sum(1 for e in entries if (e.get("added_at") or "")[:7] == month_str)
+        months.append({"month": month_str, "count": count})
+
+    top_played = sorted(
+        [e for e in entries if (e.get("playtime") or 0) > 0],
+        key=lambda e: e["playtime"], reverse=True
+    )[:5]
+
+    from collections import Counter
+    status_counts = dict(Counter(e["status"] for e in entries))
+
+    return {
+        "total": len(entries),
+        "status_counts": status_counts,
+        "avg_rating": round(sum(e["rating"] for e in rated) / len(rated), 1) if rated else None,
+        "rating_histogram": [{"rating": r, "count": rating_hist[r]} for r in sorted(rating_hist)],
+        "monthly": months,
+        "total_playtime": sum(e.get("playtime") or 0 for e in entries),
+        "top_played": [{"game_name": e["game_name"], "playtime": e["playtime"]} for e in top_played],
+    }
 
 
 # ── Price alerts ───────────────────────────────────────

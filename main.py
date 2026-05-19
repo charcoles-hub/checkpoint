@@ -1,11 +1,10 @@
 import asyncio
 import os
 import secrets
-import smtplib
+import resend
 import stripe
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
-from email.mime.text import MIMEText
 from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.middleware.base import BaseHTTPMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -20,24 +19,20 @@ from alerts import check_alerts
 
 load_dotenv()
 
-SMTP_HOST = os.getenv("SMTP_HOST", "")
-SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
-SMTP_USER = os.getenv("SMTP_USER", "")
-SMTP_PASS = os.getenv("SMTP_PASS", "")
-SMTP_FROM = os.getenv("SMTP_FROM", SMTP_USER)
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
+RESEND_FROM = os.getenv("RESEND_FROM", "Checkpoint <noreply@mycheckpoint.games>")
 
 def send_email(to: str, subject: str, body: str):
-    if not SMTP_HOST:
-        print(f"[email] SMTP not configured. Would send to {to}: {subject}")
+    if not RESEND_API_KEY:
+        print(f"[email] Resend not configured. Would send to {to}: {subject}")
         return
-    msg = MIMEText(body, "plain", "utf-8")
-    msg["Subject"] = subject
-    msg["From"] = SMTP_FROM
-    msg["To"] = to
-    with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as s:
-        s.starttls()
-        s.login(SMTP_USER, SMTP_PASS)
-        s.sendmail(SMTP_FROM, to, msg.as_string())
+    resend.api_key = RESEND_API_KEY
+    resend.Emails.send({
+        "from": RESEND_FROM,
+        "to": [to],
+        "subject": subject,
+        "text": body,
+    })
 
 
 def get_real_ip(request: Request) -> str:

@@ -8,7 +8,7 @@ from database import get_db
 
 SECRET = os.getenv("SECRET_KEY", "dev-secret-change-in-production")
 ALGO = "HS256"
-DAYS = 30
+DAYS = 7
 
 pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2 = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)

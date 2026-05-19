@@ -47,25 +47,47 @@ window.AUTH = {
   showModal(tab = 'login') {
     document.getElementById('auth-overlay').classList.add('open');
     this.switchTab(tab);
-    setTimeout(() => document.getElementById(tab === 'login' ? 'login-email' : 'reg-username').focus(), 100);
+    setTimeout(() => {
+      const focus = tab === 'login' ? 'login-email' : tab === 'register' ? 'reg-username' : 'forgot-email';
+      const el = document.getElementById(focus);
+      if (el) el.focus();
+    }, 100);
   },
 
   hideModal() {
     document.getElementById('auth-overlay').classList.remove('open');
     document.getElementById('auth-error').style.display = 'none';
+    this._clearSuccess();
   },
 
   switchTab(tab) {
     document.querySelectorAll('.auth-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
     document.getElementById('form-login').style.display = tab === 'login' ? '' : 'none';
     document.getElementById('form-register').style.display = tab === 'register' ? '' : 'none';
+    document.getElementById('form-forgot').style.display = tab === 'forgot' ? '' : 'none';
+    document.getElementById('form-reset').style.display = tab === 'reset' ? '' : 'none';
     document.getElementById('auth-error').style.display = 'none';
+    this._clearSuccess();
   },
 
   showError(msg) {
     const el = document.getElementById('auth-error');
     el.textContent = msg;
     el.style.display = '';
+    this._clearSuccess();
+  },
+
+  showSuccess(msg) {
+    this._clearSuccess();
+    const el = document.createElement('div');
+    el.className = 'auth-success'; el.id = 'auth-success';
+    el.textContent = msg;
+    document.getElementById('auth-error').insertAdjacentElement('afterend', el);
+  },
+
+  _clearSuccess() {
+    const el = document.getElementById('auth-success');
+    if (el) el.remove();
   },
 
   async doLogin(email, password) {
@@ -187,6 +209,55 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('settings-overlay').classList.remove('open');
     } catch (err) {
       alert(err.message);
+    }
+  });
+
+  // Forgot password
+  document.getElementById('btn-forgot-password').addEventListener('click', () => {
+    AUTH.switchTab('forgot');
+    document.getElementById('forgot-email').value = document.getElementById('login-email').value;
+    setTimeout(() => document.getElementById('forgot-email').focus(), 50);
+  });
+  document.getElementById('btn-back-to-login').addEventListener('click', () => AUTH.switchTab('login'));
+
+  document.getElementById('form-forgot').addEventListener('submit', async e => {
+    e.preventDefault();
+    const btn = e.target.querySelector('button[type="submit"]');
+    btn.disabled = true; btn.textContent = 'Enviando...';
+    try {
+      await AUTH.apiFetch('/api/auth/forgot-password', {
+        method: 'POST',
+        body: JSON.stringify({ email: document.getElementById('forgot-email').value })
+      });
+      AUTH.showSuccess('Si el email existe, recibirás un enlace en breve. Revisa tu bandeja de entrada.');
+      e.target.reset();
+    } catch (err) {
+      AUTH.showError(err.message);
+    } finally {
+      btn.disabled = false; btn.textContent = 'Enviar enlace';
+    }
+  });
+
+  document.getElementById('form-reset').addEventListener('submit', async e => {
+    e.preventDefault();
+    const pw = document.getElementById('reset-password').value;
+    const pw2 = document.getElementById('reset-password2').value;
+    if (pw !== pw2) { AUTH.showError('Las contraseñas no coinciden'); return; }
+    const btn = e.target.querySelector('button[type="submit"]');
+    btn.disabled = true; btn.textContent = 'Guardando...';
+    try {
+      const token = new URLSearchParams(location.search).get('token');
+      await AUTH.apiFetch('/api/auth/reset-password', {
+        method: 'POST',
+        body: JSON.stringify({ token, password: pw })
+      });
+      history.replaceState({}, '', '/');
+      AUTH.showSuccess('¡Contraseña cambiada! Ya puedes iniciar sesión.');
+      setTimeout(() => AUTH.switchTab('login'), 1800);
+    } catch (err) {
+      AUTH.showError(err.message);
+    } finally {
+      btn.disabled = false; btn.textContent = 'Cambiar contraseña';
     }
   });
 

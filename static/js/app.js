@@ -65,6 +65,17 @@ function resetHome() {
 // ── Routing ──────────────────────────────────────────
 function route() {
   const path = location.pathname;
+  if (path === '/reset-password') {
+    const token = new URLSearchParams(location.search).get('token');
+    showView('home'); loadGames(); initGenrePills();
+    if (token) {
+      setTimeout(() => {
+        AUTH.showModal('login');
+        AUTH.switchTab('reset');
+      }, 200);
+    }
+    return;
+  }
   if (path === '/' || path === '') { showView('home'); loadGames(); initGenrePills(); }
   else if (path === '/mylist') { showView('mylist'); loadMyList(); }
   else if (path === '/ranking') { showView('ranking'); loadRanking(); }

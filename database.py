@@ -120,6 +120,13 @@ def _init_sqlite():
             created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(follower_id, following_id)
         );
+        CREATE TABLE IF NOT EXISTS password_reset_tokens (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            token      TEXT UNIQUE NOT NULL,
+            expires_at TIMESTAMP NOT NULL,
+            used       INTEGER NOT NULL DEFAULT 0
+        );
     """)
     db.commit()
     db.close()
@@ -188,6 +195,13 @@ def _init_pg():
             following_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
             created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(follower_id, following_id)
+        )""",
+        """CREATE TABLE IF NOT EXISTS password_reset_tokens (
+            id         SERIAL PRIMARY KEY,
+            user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            token      TEXT UNIQUE NOT NULL,
+            expires_at TIMESTAMP NOT NULL,
+            used       INTEGER NOT NULL DEFAULT 0
         )""",
     ]
     for stmt in stmts:

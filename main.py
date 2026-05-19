@@ -1,10 +1,17 @@
 import asyncio
 import os
+import secrets
+import smtplib
 import stripe
 from contextlib import asynccontextmanager
+from datetime import datetime, timedelta
+from email.mime.text import MIMEText
 from fastapi import FastAPI, Depends, HTTPException, Request
+from fastapi.middleware.base import BaseHTTPMiddleware
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 import httpx
 from dotenv import load_dotenv
 from database import get_db, init_db
@@ -12,6 +19,35 @@ from auth import hash_pw, verify_pw, make_token, current_user, require_auth
 from alerts import check_alerts
 
 load_dotenv()
+
+SMTP_HOST = os.getenv("SMTP_HOST", "")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USER = os.getenv("SMTP_USER", "")
+SMTP_PASS = os.getenv("SMTP_PASS", "")
+SMTP_FROM = os.getenv("SMTP_FROM", SMTP_USER)
+
+def send_email(to: str, subject: str, body: str):
+    if not SMTP_HOST:
+        print(f"[email] SMTP not configured. Would send to {to}: {subject}")
+        return
+    msg = MIMEText(body, "plain", "utf-8")
+    msg["Subject"] = subject
+    msg["From"] = SMTP_FROM
+    msg["To"] = to
+    with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as s:
+        s.starttls()
+        s.login(SMTP_USER, SMTP_PASS)
+        s.sendmail(SMTP_FROM, to, msg.as_string())
+
+
+def get_real_ip(request: Request) -> str:
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
+limiter = Limiter(key_func=get_real_ip)
 
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
 STRIPE_PRICE_ID = os.getenv("STRIPE_PRICE_ID", "")
@@ -30,6 +66,32 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline'; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            "font-src https://fonts.gstatic.com; "
+            "img-src 'self' https://cdn.akamai.steamstatic.com https://media.steampowered.com "
+            "https://steamcdn-a.akamaihd.net https://shared.steamstatic.com data: blob:; "
+            "connect-src 'self'; "
+            "frame-ancestors 'none';"
+        )
+        return response
+
+
+app.add_middleware(SecurityHeadersMiddleware)
 
 STEAM = "https://store.steampowered.com/api"
 STEAMSPY = "https://steamspy.com/api.php"
@@ -107,19 +169,18 @@ async def game_detail(game_id: int):
 
 # ── Auth ───────────────────────────────────────────────
 class RegisterIn(BaseModel):
-    username: str
-    email: str
-    password: str
+    username: str = Field(min_length=3, max_length=30)
+    email: str = Field(max_length=254)
+    password: str = Field(min_length=6, max_length=128)
 
 class LoginIn(BaseModel):
-    email: str
-    password: str
+    email: str = Field(max_length=254)
+    password: str = Field(max_length=128)
 
 
 @app.post("/api/auth/register")
-def register(body: RegisterIn):
-    if len(body.username) < 3:
-        raise HTTPException(400, "El nombre debe tener al menos 3 caracteres")
+@limiter.limit("5/minute")
+def register(request: Request, body: RegisterIn):
     if len(body.password) < 6:
         raise HTTPException(400, "La contraseña debe tener al menos 6 caracteres")
     db = get_db()
@@ -134,7 +195,8 @@ def register(body: RegisterIn):
 
 
 @app.post("/api/auth/login")
-def login(body: LoginIn):
+@limiter.limit("10/minute")
+def login(request: Request, body: LoginIn):
     db = get_db()
     row = db.execute("SELECT * FROM users WHERE email=?", (body.email,)).fetchone()
     db.close()
@@ -142,6 +204,64 @@ def login(body: LoginIn):
         raise HTTPException(401, "Email o contraseña incorrectos")
     user = dict(row)
     return {"token": make_token(user["id"]), "user": _pub(user)}
+
+
+class ForgotIn(BaseModel):
+    email: str = Field(max_length=254)
+
+class ResetIn(BaseModel):
+    token: str
+    password: str = Field(min_length=6, max_length=128)
+
+
+@app.post("/api/auth/forgot-password")
+@limiter.limit("3/minute")
+def forgot_password(request: Request, body: ForgotIn):
+    db = get_db()
+    try:
+        row = db.execute("SELECT id, email FROM users WHERE email=?", (body.email,)).fetchone()
+        if not row:
+            return {"ok": True}  # No revelar si el email existe
+        token = secrets.token_urlsafe(32)
+        expires = datetime.utcnow() + timedelta(hours=1)
+        db.execute(
+            "DELETE FROM password_reset_tokens WHERE user_id=?", (row["id"],)
+        )
+        db.execute(
+            "INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES (?,?,?)",
+            (row["id"], token, expires.isoformat())
+        )
+        db.commit()
+    finally:
+        db.close()
+    reset_url = f"{APP_URL}/reset-password?token={token}"
+    send_email(
+        body.email,
+        "Restablecer contraseña · Checkpoint",
+        f"Hola,\n\nHaz clic en este enlace para crear una nueva contraseña:\n{reset_url}\n\nExpira en 1 hora. Si no lo pediste, ignora este email.\n\nCheckpoint"
+    )
+    return {"ok": True}
+
+
+@app.post("/api/auth/reset-password")
+@limiter.limit("5/minute")
+def reset_password(request: Request, body: ResetIn):
+    db = get_db()
+    try:
+        row = db.execute(
+            "SELECT user_id, expires_at, used FROM password_reset_tokens WHERE token=?",
+            (body.token,)
+        ).fetchone()
+        if not row or row["used"]:
+            raise HTTPException(400, "Enlace inválido o ya utilizado")
+        if datetime.utcnow() > datetime.fromisoformat(str(row["expires_at"])):
+            raise HTTPException(400, "El enlace ha expirado. Solicita uno nuevo")
+        db.execute("UPDATE users SET password_hash=? WHERE id=?", (hash_pw(body.password), row["user_id"]))
+        db.execute("UPDATE password_reset_tokens SET used=1 WHERE token=?", (body.token,))
+        db.commit()
+    finally:
+        db.close()
+    return {"ok": True}
 
 
 @app.get("/api/auth/me")
@@ -647,6 +767,7 @@ async def games_by_genre(genre_key: str, page: int = 1):
 @app.get("/mylist")
 @app.get("/explore")
 @app.get("/explore/{genre_key}")
+@app.get("/reset-password")
 async def spa_fallback():
     return FileResponse("static/index.html")
 

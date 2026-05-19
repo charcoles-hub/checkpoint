@@ -1306,7 +1306,10 @@ document.getElementById('btn-premium-menu').addEventListener('click', () => {
     // Open billing portal to manage subscription
     AUTH.apiFetch('/api/billing/portal', { method: 'POST' })
       .then(r => { window.location.href = r.url; })
-      .catch(() => showToast(t('toast.portal_error')));
+      .catch(err => {
+        if (err.status === 400) showToast(t('toast.portal_no_stripe'));
+        else showToast(t('toast.portal_error'));
+      });
   } else {
     showPremiumModal();
   }

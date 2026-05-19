@@ -24,6 +24,7 @@
       <button class="btn-ghost" id="nav-explore" data-i18n="nav.explore">Explorar</button>
       <button class="btn-ghost" id="nav-ranking" data-i18n="nav.ranking">Ranking</button>
       <button class="btn-ghost" id="nav-community" data-i18n="nav.community">Comunidad</button>
+      <button class="btn-ghost" id="nav-ideas" data-i18n="nav.ideas">💡 Ideas</button>
       <button class="btn-ghost" id="nav-profile-me" style="display:none" data-i18n="nav.profile_me">Mi perfil</button>
       <div class="user-menu" id="user-menu" style="display:none">
         <button class="btn-user" id="btn-username"></button>
@@ -43,6 +44,26 @@
 </nav>
 
 <main>
+  <!-- IDEAS VIEW -->
+  <div id="view-ideas" style="display:none">
+    <section class="games-section" style="padding-top:100px">
+      <div class="section-header" style="align-items:flex-start;flex-wrap:wrap;gap:16px">
+        <div>
+          <h2 data-i18n="ideas.title">💡 Ideas & Sugerencias</h2>
+          <p style="color:var(--muted);font-size:0.9rem;margin-top:4px" data-i18n="ideas.subtitle">Vota por lo que te gustaría ver en Checkpoint</p>
+        </div>
+        <button class="btn-primary" id="btn-new-idea" style="display:none" data-i18n="ideas.btn_new">+ Nueva idea</button>
+      </div>
+      <div class="list-tabs" id="ideas-tabs" style="margin-bottom:24px">
+        <button class="list-tab active" data-filter="all" data-i18n="tab.all">Todas</button>
+        <button class="list-tab" data-filter="open" data-i18n="ideas.tab_open">Abiertas</button>
+        <button class="list-tab" data-filter="planned" data-i18n="ideas.tab_planned">Planificadas</button>
+        <button class="list-tab" data-filter="done" data-i18n="ideas.tab_done">Hechas</button>
+      </div>
+      <div id="ideas-list"></div>
+    </section>
+  </div>
+
   <!-- HOME VIEW -->
   <div id="view-home">
     <section class="hero">
@@ -166,6 +187,7 @@
         <button class="list-tab active" data-tab="mygames" data-i18n="nav.mylist">Mis juegos</button>
         <button class="list-tab" data-tab="wishlist" data-i18n="nav.wishlist">Deseados</button>
         <button class="list-tab" data-tab="stats" data-i18n="profile_me.tab_stats">Estadísticas</button>
+        <button class="list-tab" data-tab="steam" data-i18n="profile_me.tab_steam">🎮 Steam</button>
         <button class="list-tab" data-tab="account" data-i18n="profile_me.tab_account">Mi cuenta</button>
       </div>
 
@@ -192,6 +214,11 @@
       <!-- Panel: Estadísticas -->
       <div id="panel-stats" style="display:none">
         <div id="stats-content"></div>
+      </div>
+
+      <!-- Panel: Steam -->
+      <div id="panel-steam" style="display:none">
+        <div id="steam-tab-content"></div>
       </div>
 
       <!-- Panel: Mi cuenta -->
@@ -303,12 +330,7 @@
   <div class="modal modal-sm" id="settings-modal">
     <button class="modal-close" id="settings-close">✕</button>
     <div style="padding:32px 28px">
-      <h3 style="margin-bottom:20px;font-size:1.2rem;font-weight:700" data-i18n="settings.title">Ajustes</h3>
-
-      <label class="field-label" data-i18n="settings.steam_label">Steam ID o nombre de usuario de Steam</label>
-      <input class="field-input" type="text" id="steam-id-input" data-i18n-placeholder="settings.steam_placeholder" placeholder="ej: sergiogg o 76561198xxxxxxxxx" />
-      <p style="color:var(--muted);font-size:0.8rem;margin:-8px 0 16px" data-i18n="settings.steam_hint">Tu perfil de Steam debe ser público. Puedes usar tu nombre de usuario o tu SteamID64.</p>
-      <button class="btn-ghost w-full" id="btn-steam-preview" style="margin-bottom:20px" data-i18n="settings.steam_btn">🎮 Conectar Steam e importar juegos</button>
+      <h3 style="margin-bottom:20px;font-size:1.2rem;font-weight:700" data-i18n="settings.title">Notificaciones</h3>
 
       <label class="field-label" data-i18n="settings.ntfy_label">Topic de ntfy.sh (para alertas de precio)</label>
       <input class="field-input" type="text" id="ntfy-topic" data-i18n-placeholder="settings.ntfy_placeholder" placeholder="mi-topic-secreto" />
@@ -325,6 +347,23 @@
     <div style="padding:28px">
       <h3 style="font-size:1.2rem;font-weight:700;margin-bottom:6px">🎮 Importar desde Steam</h3>
       <div id="steam-content"></div>
+    </div>
+  </div>
+</div>
+
+<!-- New suggestion modal -->
+<div class="modal-overlay" id="idea-overlay">
+  <div class="modal modal-sm" id="idea-modal">
+    <button class="modal-close" id="idea-close">✕</button>
+    <div style="padding:32px 28px">
+      <h3 style="font-size:1.2rem;font-weight:700;margin-bottom:6px" data-i18n="ideas.modal_title">Nueva sugerencia</h3>
+      <p style="color:var(--muted);font-size:0.85rem;margin-bottom:20px" data-i18n="ideas.modal_hint">Cuéntanos qué mejoraría tu experiencia en Checkpoint</p>
+      <label class="field-label" data-i18n="ideas.label_title">Título</label>
+      <input type="text" id="idea-title" class="field-input" maxlength="100" data-i18n-placeholder="ideas.placeholder_title" placeholder="Ej: Poder exportar mi lista a CSV" style="margin-bottom:16px" />
+      <label class="field-label" data-i18n="ideas.label_body">Descripción <span style="color:var(--muted);font-size:0.8rem">(opcional)</span></label>
+      <textarea id="idea-body" class="field-input" rows="4" maxlength="500" data-i18n-placeholder="ideas.placeholder_body" placeholder="Añade más detalles si quieres..." style="resize:vertical;margin-bottom:20px"></textarea>
+      <button class="btn-primary w-full" id="btn-submit-idea" data-i18n="ideas.btn_submit">Enviar sugerencia</button>
+      <p id="idea-msg" style="display:none;text-align:center;margin-top:12px;font-size:0.88rem"></p>
     </div>
   </div>
 </div>

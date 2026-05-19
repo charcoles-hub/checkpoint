@@ -523,6 +523,41 @@ body {
 }
 .game-review-snippet { font-style: normal; color: var(--muted2); }
 
+/* ── Suggestions / Ideas ────────────────────────────── */
+.suggestion-card {
+  display: flex; gap: 16px; align-items: flex-start;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 12px; padding: 18px 20px; margin-bottom: 12px;
+  transition: border-color 0.2s;
+}
+.suggestion-card:hover { border-color: var(--purple); }
+.vote-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  background: none; border: 1px solid var(--border); border-radius: 8px;
+  padding: 8px 12px; cursor: pointer; color: var(--muted); min-width: 52px;
+  transition: all 0.15s; flex-shrink: 0;
+}
+.vote-btn:hover { border-color: var(--purple); color: var(--purple); }
+.vote-btn.voted { background: rgba(139,92,246,0.15); border-color: var(--purple); color: var(--purple); }
+.vote-arrow { font-size: 0.75rem; }
+.vote-count { font-size: 1rem; font-weight: 700; line-height: 1; }
+.suggestion-body { flex: 1; min-width: 0; }
+.suggestion-top { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 6px; flex-wrap: wrap; }
+.suggestion-title { font-size: 1rem; font-weight: 600; margin: 0; }
+.suggestion-status { font-size: 0.75rem; font-weight: 600; padding: 2px 8px; border-radius: 20px; white-space: nowrap; }
+.suggestion-open    { background: rgba(139,92,246,0.12); color: var(--purple); }
+.suggestion-planned { background: rgba(250,204,21,0.15); color: #facc15; }
+.suggestion-done    { background: rgba(74,222,128,0.15); color: #4ade80; }
+.suggestion-desc { color: var(--muted2); font-size: 0.88rem; margin: 0 0 8px; line-height: 1.5; }
+.suggestion-meta { font-size: 0.78rem; color: var(--muted); }
+.admin-actions { display: flex; gap: 6px; margin-top: 8px; }
+.admin-status-btn {
+  background: none; border: 1px solid var(--border); border-radius: 6px;
+  padding: 2px 8px; cursor: pointer; font-size: 1rem;
+  transition: background 0.15s;
+}
+.admin-status-btn:hover { background: var(--surface); }
+
 /* RANKING */
 .ranking-row {
   display: flex; align-items: center; gap: 16px;

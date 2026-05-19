@@ -55,6 +55,7 @@ APP_URL = os.getenv("APP_URL", "https://mycheckpoint.games")
 STEAM_API_KEY = os.getenv("STEAM_API_KEY", "")
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "")
 if STRIPE_SECRET_KEY:
     stripe.api_key = STRIPE_SECRET_KEY
 
@@ -456,6 +457,83 @@ def ranking():
     """).fetchall()
     db.close()
     return [dict(r) for r in rows]
+
+
+# ── Suggestions (roadmap) ─────────────────────────────
+class SuggestionIn(BaseModel):
+    title: str = Field(min_length=5, max_length=100)
+    body: str | None = Field(None, max_length=500)
+
+
+@app.get("/api/suggestions")
+def list_suggestions(user=Depends(current_user)):
+    db = get_db()
+    rows = db.execute("""
+        SELECT s.id, s.title, s.body, s.status, s.created_at,
+               u.username as author,
+               (SELECT COUNT(*) FROM suggestion_votes sv WHERE sv.suggestion_id = s.id) as votes
+        FROM suggestions s
+        LEFT JOIN users u ON u.id = s.user_id
+        ORDER BY votes DESC, s.created_at DESC
+    """).fetchall()
+    user_votes = set()
+    if user:
+        voted = db.execute(
+            "SELECT suggestion_id FROM suggestion_votes WHERE user_id=?", (user["id"],)
+        ).fetchall()
+        user_votes = {r["suggestion_id"] for r in voted}
+    db.close()
+    is_admin = bool(ADMIN_USERNAME and user and user.get("username") == ADMIN_USERNAME)
+    return {
+        "is_admin": is_admin,
+        "suggestions": [{**dict(r), "voted": r["id"] in user_votes} for r in rows],
+    }
+
+
+@app.post("/api/suggestions")
+@limiter.limit("5/hour")
+def create_suggestion(request: Request, body: SuggestionIn, user=Depends(require_auth)):
+    db = get_db()
+    db.execute(
+        "INSERT INTO suggestions (user_id, title, body) VALUES (?,?,?)",
+        (user["id"], body.title.strip(), body.body.strip() if body.body else None),
+    )
+    db.commit(); db.close()
+    return {"ok": True}
+
+
+@app.post("/api/suggestions/{sid}/vote")
+@limiter.limit("120/minute")
+def toggle_vote(request: Request, sid: int, user=Depends(require_auth)):
+    db = get_db()
+    existing = db.execute(
+        "SELECT id FROM suggestion_votes WHERE suggestion_id=? AND user_id=?", (sid, user["id"])
+    ).fetchone()
+    if existing:
+        db.execute("DELETE FROM suggestion_votes WHERE suggestion_id=? AND user_id=?", (sid, user["id"]))
+        voted = False
+    else:
+        db.execute("INSERT INTO suggestion_votes (suggestion_id, user_id) VALUES (?,?)", (sid, user["id"]))
+        voted = True
+    db.commit()
+    count = db.execute(
+        "SELECT COUNT(*) as c FROM suggestion_votes WHERE suggestion_id=?", (sid,)
+    ).fetchone()["c"]
+    db.close()
+    return {"voted": voted, "count": count}
+
+
+@app.patch("/api/suggestions/{sid}")
+def update_suggestion(sid: int, body: dict, user=Depends(require_auth)):
+    if not ADMIN_USERNAME or user.get("username") != ADMIN_USERNAME:
+        raise HTTPException(403, "No autorizado")
+    status = body.get("status", "open")
+    if status not in ("open", "planned", "done"):
+        raise HTTPException(400, "Estado inválido")
+    db = get_db()
+    db.execute("UPDATE suggestions SET status=? WHERE id=?", (status, sid))
+    db.commit(); db.close()
+    return {"ok": True}
 
 
 # ── Game list ──────────────────────────────────────────

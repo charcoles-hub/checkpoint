@@ -19,7 +19,7 @@ let totalGames = 0;
 let genreCache = null;
 
 // ── Views ────────────────────────────────────────────
-const VIEWS = ['home', 'profile-me', 'ranking', 'profile', 'explore', 'community'];
+const VIEWS = ['home', 'profile-me', 'ranking', 'profile', 'explore', 'community', 'ideas'];
 
 function showView(name) {
   VIEWS.forEach(v => {
@@ -49,6 +49,7 @@ document.getElementById('nav-profile-me').addEventListener('click', () => { hist
 document.getElementById('nav-ranking').addEventListener('click', () => { history.pushState({}, '', '/ranking'); showView('ranking'); loadRanking(); closeMenu(); });
 document.getElementById('nav-explore').addEventListener('click', () => { history.pushState({}, '', '/explore'); showView('explore'); loadExplore(); closeMenu(); });
 document.getElementById('nav-community').addEventListener('click', () => { history.pushState({}, '', '/community'); showView('community'); loadCommunity(); closeMenu(); });
+document.getElementById('nav-ideas').addEventListener('click', () => { history.pushState({}, '', '/ideas'); showView('ideas'); loadIdeas(); closeMenu(); });
 
 function resetHome() {
   currentPage = 1; currentSearch = ''; currentGenre = ''; currentPlatform = ''; currentSort = 'popular';
@@ -109,6 +110,7 @@ function route() {
   }
   else if (path.startsWith('/u/')) { showView('profile'); loadProfile(path.slice(3)); }
   else if (path === '/community') { showView('community'); loadCommunity(); }
+  else if (path === '/ideas') { showView('ideas'); loadIdeas(); }
   else { showView('home'); loadGames(); initGenrePills(); }
 }
 
@@ -710,12 +712,13 @@ function loadProfileMe() {
 
 function switchProfileTab(tab) {
   profileMeTab = tab;
-  ['mygames', 'wishlist', 'stats', 'account'].forEach(p => {
+  ['mygames', 'wishlist', 'stats', 'steam', 'account'].forEach(p => {
     document.getElementById(`panel-${p}`).style.display = p === tab ? '' : 'none';
   });
   if (tab === 'mygames') loadMyList();
   else if (tab === 'wishlist') loadWishlist();
   else if (tab === 'stats') loadStats();
+  else if (tab === 'steam') loadSteamTab();
   else if (tab === 'account') loadMyAccount();
 }
 
@@ -1419,6 +1422,204 @@ async function openSteamImport(steamId) {
         <p style="color:var(--muted);font-size:0.85rem">${t('steam.error_public')}</p>
       </div>`;
   }
+}
+
+// ── Steam Tab ─────────────────────────────────────────
+function loadSteamTab() {
+  const el = document.getElementById('steam-tab-content');
+  const steamId = AUTH.user?.steam_id || '';
+  el.innerHTML = `
+    <div style="max-width:480px">
+      ${steamId ? `<p style="color:var(--muted);font-size:0.88rem;margin-bottom:12px">${t('steam.connected', {id: escHtml(steamId)})}</p>` : ''}
+      <label class="field-label">${t('settings.steam_label')}</label>
+      <input type="text" id="steam-id-tab" class="field-input" value="${escHtml(steamId)}"
+        placeholder="${t('settings.steam_placeholder')}" style="margin-bottom:8px" />
+      <p style="color:var(--muted);font-size:0.8rem;margin-bottom:20px">${t('settings.steam_hint')}</p>
+      <button class="btn-primary" id="btn-steam-preview-tab">🎮 ${t('steam.btn_preview')}</button>
+      <div id="steam-inline-result" style="margin-top:20px"></div>
+    </div>
+  `;
+  document.getElementById('btn-steam-preview-tab').addEventListener('click', async () => {
+    const sid = document.getElementById('steam-id-tab').value.trim();
+    if (!sid) return;
+    const btn = document.getElementById('btn-steam-preview-tab');
+    const resultEl = document.getElementById('steam-inline-result');
+    btn.disabled = true; btn.textContent = t('loading.steam');
+    resultEl.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+    try {
+      const preview = await AUTH.apiFetch(`/api/steam/preview?steam_id=${encodeURIComponent(sid)}`);
+      const played = preview.games.filter(g => g.playtime > 0).length;
+      resultEl.innerHTML = `
+        <p style="color:var(--muted);margin-bottom:12px;font-size:0.9rem">${t('steam.found', {n: preview.total})}</p>
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:16px;font-size:0.85rem">
+          <div style="color:var(--muted2);margin-bottom:8px">${t('steam.top_hours')}</div>
+          ${preview.games.slice(0, 5).map(g => `
+            <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)">
+              <span>${escHtml(g.name)}</span>
+              <span style="color:var(--cyan)">${Math.round(g.playtime/60)}h</span>
+            </div>`).join('')}
+        </div>
+        <div style="margin-bottom:16px">
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:10px">
+            <input type="radio" name="import-mode-tab" value="played" checked />
+            <span>${t('steam.mode_played', {n: played})}</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+            <input type="radio" name="import-mode-tab" value="all" />
+            <span>${t('steam.mode_all', {n: preview.total})}</span>
+          </label>
+        </div>
+        <button class="btn-primary w-full" id="btn-do-import-tab">${t('steam.btn_import')}</button>
+        <p style="color:var(--muted);font-size:0.75rem;margin-top:10px;text-align:center">${t('steam.note')}</p>
+      `;
+      document.getElementById('btn-do-import-tab').addEventListener('click', async () => {
+        const onlyPlayed = document.querySelector('input[name="import-mode-tab"]:checked').value === 'played';
+        const impBtn = document.getElementById('btn-do-import-tab');
+        impBtn.disabled = true; impBtn.textContent = t('steam.btn_importing');
+        try {
+          const result = await AUTH.apiFetch('/api/steam/import', {
+            method: 'POST',
+            body: JSON.stringify({ steam_id: preview.steam_id, games: preview.games, only_played: onlyPlayed })
+          });
+          AUTH.user.steam_id = preview.steam_id;
+          localStorage.setItem('gl_user', JSON.stringify(AUTH.user));
+          showToast(t('toast.steam_imported', {n: result.imported}));
+          profileMeTab = 'mygames'; switchProfileTab('mygames');
+        } catch (e) {
+          showToast(translateError(e.message));
+          impBtn.disabled = false; impBtn.textContent = t('steam.btn_import');
+        }
+      });
+    } catch(e) {
+      resultEl.innerHTML = `
+        <p style="color:#ef4444;margin-bottom:8px">${escHtml(translateError(e.message))}</p>
+        <p style="color:var(--muted);font-size:0.85rem">${t('steam.error_public')}</p>`;
+    } finally {
+      btn.disabled = false; btn.textContent = `🎮 ${t('steam.btn_preview')}`;
+    }
+  });
+}
+
+// ── Ideas / Roadmap ───────────────────────────────────
+let ideasFilter = 'all';
+let ideasData = { is_admin: false, suggestions: [] };
+
+async function loadIdeas() {
+  const el = document.getElementById('ideas-list');
+  el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  document.getElementById('btn-new-idea').style.display = AUTH.user ? '' : 'none';
+
+  document.querySelectorAll('#ideas-tabs .list-tab').forEach(tab => {
+    const fresh = tab.cloneNode(true);
+    tab.parentNode.replaceChild(fresh, tab);
+    fresh.addEventListener('click', () => {
+      document.querySelectorAll('#ideas-tabs .list-tab').forEach(t => t.classList.remove('active'));
+      fresh.classList.add('active');
+      ideasFilter = fresh.dataset.filter;
+      renderIdeas();
+    });
+  });
+
+  try {
+    ideasData = await fetch('/api/suggestions').then(r => r.json());
+    renderIdeas();
+  } catch { el.innerHTML = `<div class="no-results">${t('modal.error')}</div>`; }
+
+  const ideaOverlay = document.getElementById('idea-overlay');
+  document.getElementById('idea-close').onclick = () => ideaOverlay.classList.remove('open');
+  ideaOverlay.onclick = e => { if (e.target === ideaOverlay) ideaOverlay.classList.remove('open'); };
+
+  document.getElementById('btn-new-idea').onclick = () => {
+    if (!AUTH.user) { AUTH.showModal('login'); return; }
+    document.getElementById('idea-title').value = '';
+    document.getElementById('idea-body').value = '';
+    document.getElementById('idea-msg').style.display = 'none';
+    ideaOverlay.classList.add('open');
+  };
+
+  document.getElementById('btn-submit-idea').onclick = async () => {
+    const title = document.getElementById('idea-title').value.trim();
+    const body = document.getElementById('idea-body').value.trim();
+    const msgEl = document.getElementById('idea-msg');
+    const btn = document.getElementById('btn-submit-idea');
+    if (title.length < 5) { msgEl.style.display = ''; msgEl.style.color = '#ef4444'; msgEl.textContent = t('ideas.err_title'); return; }
+    btn.disabled = true; btn.textContent = t('ideas.btn_sending');
+    try {
+      await AUTH.apiFetch('/api/suggestions', { method: 'POST', body: JSON.stringify({ title, body: body || null }) });
+      ideaOverlay.classList.remove('open');
+      showToast(t('ideas.toast_sent'));
+      ideasData = await fetch('/api/suggestions').then(r => r.json());
+      renderIdeas();
+    } catch(e) {
+      msgEl.style.display = ''; msgEl.style.color = '#ef4444'; msgEl.textContent = e.message;
+    } finally {
+      btn.disabled = false; btn.textContent = t('ideas.btn_submit');
+    }
+  };
+}
+
+function renderIdeas() {
+  const el = document.getElementById('ideas-list');
+  const list = ideasFilter === 'all'
+    ? ideasData.suggestions
+    : ideasData.suggestions.filter(s => s.status === ideasFilter);
+
+  if (!list.length) { el.innerHTML = `<div class="no-results">${t('ideas.empty')}</div>`; return; }
+
+  el.innerHTML = '';
+  list.forEach(s => el.appendChild(renderSuggestionCard(s)));
+}
+
+function renderSuggestionCard(s) {
+  const statusLabels = { open: t('ideas.status_open'), planned: t('ideas.status_planned'), done: t('ideas.status_done') };
+  const statusCls = { open: 'suggestion-open', planned: 'suggestion-planned', done: 'suggestion-done' };
+
+  const card = document.createElement('div');
+  card.className = 'suggestion-card';
+  card.innerHTML = `
+    <button class="vote-btn ${s.voted ? 'voted' : ''}" data-id="${s.id}">
+      <span class="vote-arrow">▲</span>
+      <span class="vote-count">${s.votes}</span>
+    </button>
+    <div class="suggestion-body">
+      <div class="suggestion-top">
+        <h3 class="suggestion-title">${escHtml(s.title)}</h3>
+        <span class="suggestion-status ${statusCls[s.status] || ''}">${statusLabels[s.status] || s.status}</span>
+      </div>
+      ${s.body ? `<p class="suggestion-desc">${escHtml(s.body)}</p>` : ''}
+      <div class="suggestion-meta">
+        ${s.author ? `@${escHtml(s.author)}` : t('ideas.anonymous')} · ${timeAgo(s.created_at)}
+      </div>
+      ${ideasData.is_admin ? `
+        <div class="admin-actions">
+          <button class="admin-status-btn" data-id="${s.id}" data-status="open">💡</button>
+          <button class="admin-status-btn" data-id="${s.id}" data-status="planned">📋</button>
+          <button class="admin-status-btn" data-id="${s.id}" data-status="done">✅</button>
+        </div>` : ''}
+    </div>
+  `;
+
+  card.querySelector('.vote-btn').addEventListener('click', async () => {
+    if (!AUTH.user) { AUTH.showModal('login'); return; }
+    const btn = card.querySelector('.vote-btn');
+    try {
+      const r = await AUTH.apiFetch(`/api/suggestions/${s.id}/vote`, { method: 'POST' });
+      s.voted = r.voted; s.votes = r.count;
+      btn.classList.toggle('voted', r.voted);
+      btn.querySelector('.vote-count').textContent = r.count;
+    } catch {}
+  });
+
+  card.querySelectorAll('.admin-status-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      await AUTH.apiFetch(`/api/suggestions/${s.id}`, { method: 'PATCH', body: JSON.stringify({ status: btn.dataset.status }) });
+      s.status = btn.dataset.status;
+      card.querySelector('.suggestion-status').className = `suggestion-status ${statusCls[s.status] || ''}`;
+      card.querySelector('.suggestion-status').textContent = statusLabels[s.status];
+    });
+  });
+
+  return card;
 }
 
 // ── Premium ───────────────────────────────────────────

@@ -132,6 +132,20 @@ def _init_sqlite():
             expires_at TIMESTAMP NOT NULL,
             used       INTEGER NOT NULL DEFAULT 0
         );
+        CREATE TABLE IF NOT EXISTS suggestions (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id    INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            title      TEXT NOT NULL,
+            body       TEXT,
+            status     TEXT NOT NULL DEFAULT 'open',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS suggestion_votes (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            suggestion_id   INTEGER NOT NULL REFERENCES suggestions(id) ON DELETE CASCADE,
+            user_id         INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            UNIQUE(suggestion_id, user_id)
+        );
     """)
     db.commit()
     db.close()
@@ -212,6 +226,20 @@ def _init_pg():
             token      TEXT UNIQUE NOT NULL,
             expires_at TIMESTAMP NOT NULL,
             used       INTEGER NOT NULL DEFAULT 0
+        )""",
+        """CREATE TABLE IF NOT EXISTS suggestions (
+            id         SERIAL PRIMARY KEY,
+            user_id    INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            title      TEXT NOT NULL,
+            body       TEXT,
+            status     TEXT NOT NULL DEFAULT 'open',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )""",
+        """CREATE TABLE IF NOT EXISTS suggestion_votes (
+            id              SERIAL PRIMARY KEY,
+            suggestion_id   INTEGER NOT NULL REFERENCES suggestions(id) ON DELETE CASCADE,
+            user_id         INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            UNIQUE(suggestion_id, user_id)
         )""",
     ]
     for stmt in stmts:

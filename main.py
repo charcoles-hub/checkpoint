@@ -759,10 +759,10 @@ def billing_portal(user=Depends(require_auth)):
     row = db.execute("SELECT stripe_customer_id FROM users WHERE id=?", (user["id"],)).fetchone()
     db.close()
     if not row or not row["stripe_customer_id"]:
-        raise HTTPException(400, "No tienes suscripción activa")
+        raise HTTPException(400, "Tu cuenta premium fue activada manualmente y no tiene suscripción de Stripe asociada")
     session = stripe.billing_portal.Session.create(
         customer=row["stripe_customer_id"],
-        return_url=f"{APP_URL}/mylist",
+        return_url=f"{APP_URL}/mi-perfil",
     )
     return {"url": session.url}
 

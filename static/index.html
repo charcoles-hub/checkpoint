@@ -116,17 +116,25 @@
       </div>
     </section>
     <section class="games-section">
-      <div class="section-header">
-        <h2 id="section-title" data-i18n="section.popular">Juegos populares</h2>
-        <div class="sort-tabs" id="sort-tabs">
-          <button class="sort-tab active" data-sort="popular" data-i18n="sort.popular">Popularidad</button>
-          <button class="sort-tab" data-sort="community" data-i18n="sort.community">Valoración comunidad</button>
+      <div class="home-columns">
+        <div class="home-main">
+          <div class="section-header">
+            <h2 id="section-title" data-i18n="section.community_top">Popular en la comunidad</h2>
+            <div class="sort-tabs" id="sort-tabs" style="display:none">
+              <button class="sort-tab active" data-sort="popular" data-i18n="sort.popular">Popularidad</button>
+              <button class="sort-tab" data-sort="community" data-i18n="sort.community">Valoración comunidad</button>
+            </div>
+          </div>
+          <div class="games-grid" id="games-grid">
+            <div class="loading"><div class="spinner"></div><p data-i18n="loading.games">Cargando...</p></div>
+          </div>
+          <div class="pagination" id="pagination"></div>
         </div>
+        <aside class="home-aside">
+          <h3 class="aside-title" data-i18n="home.feed_title">Últimas valoraciones</h3>
+          <div id="home-feed"><div class="loading"><div class="spinner"></div></div></div>
+        </aside>
       </div>
-      <div class="games-grid" id="games-grid">
-        <div class="loading"><div class="spinner"></div><p data-i18n="loading.games">Cargando...</p></div>
-      </div>
-      <div class="pagination" id="pagination"></div>
     </section>
   </div>
 

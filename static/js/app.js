@@ -86,9 +86,9 @@ document.getElementById('footer-tour').addEventListener('click', () => {
 });
 
 function resetHome() {
-  currentPage = 1; currentSearch = ''; currentGenre = ''; currentPlatform = ''; currentSort = 'popular';
+  currentPage = 1; currentSearch = ''; currentGenre = ''; currentPlatform = ''; currentSort = 'community';
   searchInput.value = '';
-  sectionTitle.textContent = t('section.popular');
+  sectionTitle.textContent = t('section.community_top');
   document.querySelectorAll('.genre-pill').forEach(p => p.classList.toggle('active', p.dataset.genre === ''));
   document.querySelectorAll('.platform-pill').forEach(p => p.classList.toggle('active', p.dataset.platform === ''));
   document.getElementById('platform-filter').style.display = 'none';
@@ -96,6 +96,7 @@ function resetHome() {
   document.querySelectorAll('#sort-tabs .sort-tab').forEach(t => t.classList.toggle('active', t.dataset.sort === 'popular'));
   showView('home');
   loadGames();
+  loadHomeFeed();
 }
 
 // ── Routing ──────────────────────────────────────────
@@ -122,7 +123,7 @@ function route() {
 
   if (path === '/reset-password') {
     const token = new URLSearchParams(location.search).get('token');
-    showView('home'); loadGames(); initGenrePills();
+    showView('home'); loadGames(); loadHomeFeed(); initGenrePills();
     if (token) {
       setTimeout(() => {
         AUTH.showModal('login');
@@ -131,7 +132,7 @@ function route() {
     }
     return;
   }
-  if (path === '/' || path === '') { showView('home'); loadGames(); initGenrePills(); }
+  if (path === '/' || path === '') { showView('home'); loadGames(); loadHomeFeed(); initGenrePills(); }
   else if (path === '/mi-perfil') { showView('profile-me'); loadProfileMe(); }
   else if (path === '/mylist') { history.replaceState({}, '', '/mi-perfil'); showView('profile-me'); profileMeTab = 'mygames'; loadProfileMe(); }
   else if (path === '/wishlist') { history.replaceState({}, '', '/mi-perfil'); showView('profile-me'); profileMeTab = 'wishlist'; loadProfileMe(); }
@@ -146,7 +147,7 @@ function route() {
   else if (path === '/community') { showView('community'); loadCommunity(); }
   else if (path === '/ideas') { showView('ideas'); loadIdeas(); }
   else if (path === '/contacto') { showView('contacto'); }
-  else { showView('home'); loadGames(); initGenrePills(); }
+  else { showView('home'); loadGames(); loadHomeFeed(); initGenrePills(); }
 }
 
 window.addEventListener('popstate', route);
@@ -180,7 +181,7 @@ function renderGenrePills(genres) {
       document.querySelectorAll('#sort-tabs .sort-tab').forEach(t => t.classList.toggle('active', t.dataset.sort === 'popular'));
       sectionTitle.textContent = currentGenre
         ? t('section.genre_best', {name: genres.find(g => g.key === currentGenre)?.name || currentGenre})
-        : t('section.popular');
+        : t('section.community_top');
       loadGames();
     });
   });
@@ -284,10 +285,11 @@ async function loadGames() {
           .filter(g => g.avg_rating)
           .sort((a, b) => (b.avg_rating || 0) - (a.avg_rating || 0));
       }
-    } else if (currentSort === 'community' && !currentSearch) {
-      // Community-rated sort on home: pull from ranking endpoint
+    } else if (!currentSearch && !currentGenre) {
+      // Home default: top 9 by community rating
       const ranking = await AUTH.apiFetch('/api/ranking');
-      data = { results: ranking.map(g => ({ ...g, id: g.steam_appid })), count: ranking.length };
+      data = { results: ranking.slice(0, 9).map(g => ({ ...g, id: g.steam_appid })), count: 9 };
+      sectionTitle.textContent = t('section.community_top');
     } else {
       // Normal search/browse
       const params = new URLSearchParams({ page: currentPage });
@@ -341,7 +343,7 @@ searchInput.addEventListener('input', e => {
     document.querySelectorAll('.platform-pill').forEach(p => p.classList.toggle('active', p.dataset.platform === ''));
     sectionTitle.textContent = q
       ? t('section.results', {q})
-      : (currentGenre ? t('section.genre_best', {name: currentGenre}) : t('section.popular'));
+      : (currentGenre ? t('section.genre_best', {name: currentGenre}) : t('section.community_top'));
     loadGames();
   }, 400);
 });
@@ -1368,6 +1370,22 @@ function renderFeedItem(e) {
     if (!ev.target.classList.contains('feed-username')) openModal(e.steam_appid);
   });
   return item;
+}
+
+// ── Home activity feed ───────────────────────────────
+async function loadHomeFeed() {
+  const feedEl = document.getElementById('home-feed');
+  if (!feedEl) return;
+  feedEl.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const items = await AUTH.apiFetch('/api/activity');
+    feedEl.innerHTML = '';
+    if (!items.length) {
+      feedEl.innerHTML = `<p style="color:var(--muted);font-size:0.85rem;padding:8px 0">${t('home.feed_empty')}</p>`;
+      return;
+    }
+    items.forEach(e => feedEl.appendChild(renderFeedItem(e)));
+  } catch { feedEl.innerHTML = ''; }
 }
 
 // ── Following section ─────────────────────────────────

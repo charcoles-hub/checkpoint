@@ -51,6 +51,7 @@ const STRINGS = {
     'sort.community': 'Valoración comunidad',
     'sort.toprated': 'Mejor valorados',
     'section.popular': 'Juegos populares',
+    'section.community_top': 'Popular en la comunidad',
     'section.results': 'Resultados para "{q}"',
     'section.genre_best': 'Mejores de {name}',
 
@@ -118,6 +119,8 @@ const STRINGS = {
     'feed.action.abandoned': 'abandonó',
     'feed.action.wishlist':  'quiere jugar',
     'feed.action.library':   'importó desde Steam',
+    'home.feed_title': 'Últimas valoraciones',
+    'home.feed_empty': 'Aún no hay actividad registrada.',
 
     'stats.total': 'Total juegos',
     'stats.avg_rating': 'Media',
@@ -384,6 +387,7 @@ const STRINGS = {
     'sort.community': 'Community rating',
     'sort.toprated': 'Top rated',
     'section.popular': 'Popular games',
+    'section.community_top': 'Popular in the community',
     'section.results': 'Results for "{q}"',
     'section.genre_best': 'Best {name}',
 
@@ -451,6 +455,8 @@ const STRINGS = {
     'feed.action.abandoned': 'abandoned',
     'feed.action.wishlist':  'wants to play',
     'feed.action.library':   'imported from Steam',
+    'home.feed_title': 'Latest activity',
+    'home.feed_empty': 'No activity recorded yet.',
 
     'stats.total': 'Total games',
     'stats.avg_rating': 'Avg. rating',

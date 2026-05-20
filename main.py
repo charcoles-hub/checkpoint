@@ -654,6 +654,22 @@ def ranking():
     return [dict(r) for r in rows]
 
 
+# ── Global activity feed ───────────────────────────────
+@app.get("/api/activity")
+def global_activity():
+    db = get_db()
+    rows = db.execute("""
+        SELECT ge.steam_appid, ge.game_name, ge.game_image,
+               ge.status, ge.rating, ge.review, ge.notes, ge.added_at,
+               u.username as player
+        FROM game_entries ge
+        JOIN users u ON u.id = ge.user_id
+        ORDER BY ge.added_at DESC LIMIT 20
+    """).fetchall()
+    db.close()
+    return [dict(r) for r in rows]
+
+
 # ── Suggestions (roadmap) ─────────────────────────────
 class SuggestionIn(BaseModel):
     title: str = Field(min_length=5, max_length=100)

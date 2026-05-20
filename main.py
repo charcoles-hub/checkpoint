@@ -674,6 +674,20 @@ def global_activity():
     return [dict(r) for r in rows]
 
 
+# ── Admin cache clear ────────────────────────────────
+@app.delete("/api/admin/cache")
+def clear_cache(secret: str = ""):
+    admin_secret = os.getenv("ADMIN_SECRET", "")
+    if not admin_secret or secret != admin_secret:
+        raise HTTPException(403, "Forbidden")
+    db = get_db()
+    db.execute("DELETE FROM api_cache WHERE key LIKE 'genre_%' OR key LIKE 'rawg_categories%'")
+    db.commit()
+    deleted = db.execute("SELECT changes()").fetchone()[0]
+    db.close()
+    return {"deleted": deleted}
+
+
 # ── Suggestions (roadmap) ─────────────────────────────
 class SuggestionIn(BaseModel):
     title: str = Field(min_length=5, max_length=100)

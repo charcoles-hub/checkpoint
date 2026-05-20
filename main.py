@@ -664,6 +664,7 @@ def global_activity():
                u.username as player
         FROM game_entries ge
         JOIN users u ON u.id = ge.user_id
+        WHERE ge.rating IS NOT NULL
         ORDER BY ge.added_at DESC LIMIT 20
     """).fetchall()
     db.close()

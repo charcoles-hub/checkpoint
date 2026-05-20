@@ -105,6 +105,7 @@ const STRINGS = {
     'mylist.no_search': 'No hay juegos en esta categoría con "{q}".',
     'mylist.profile_url': 'Tu perfil público:',
     'mylist.btn_copy': 'Copiar enlace',
+    'mylist.genre_all': 'Todas las categorías',
 
     'status.played': 'Jugado',
     'status.playing': 'Jugando',
@@ -441,6 +442,7 @@ const STRINGS = {
     'mylist.no_search': 'No games in this category matching "{q}".',
     'mylist.profile_url': 'Your public profile:',
     'mylist.btn_copy': 'Copy link',
+    'mylist.genre_all': 'All categories',
 
     'status.played': 'Played',
     'status.playing': 'Playing',

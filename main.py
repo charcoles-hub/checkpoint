@@ -772,6 +772,7 @@ class EntryIn(BaseModel):
     notes: str | None = None
     draft_notes: str | None = None
     review: str | None = None
+    genres: list[str] = []
 
 
 @app.get("/api/list")
@@ -779,7 +780,12 @@ def get_list(user=Depends(require_auth)):
     db = get_db()
     rows = db.execute("SELECT * FROM game_entries WHERE user_id=? ORDER BY added_at DESC", (user["id"],)).fetchall()
     db.close()
-    return [dict(r) for r in rows]
+    result = []
+    for r in rows:
+        entry = dict(r)
+        entry["genres"] = json.loads(entry["genres"]) if entry.get("genres") else []
+        result.append(entry)
+    return result
 
 
 @app.get("/api/list/{appid}")
@@ -793,14 +799,16 @@ def get_entry(appid: int, user=Depends(require_auth)):
 @app.post("/api/list")
 def add_to_list(body: EntryIn, user=Depends(require_auth)):
     db = get_db()
+    genres_json = json.dumps(body.genres) if body.genres else None
     db.execute("""
-        INSERT INTO game_entries (user_id, steam_appid, game_name, game_image, status, rating, notes, draft_notes, review)
-        VALUES (?,?,?,?,?,?,?,?,?)
+        INSERT INTO game_entries (user_id, steam_appid, game_name, game_image, status, rating, notes, draft_notes, review, genres)
+        VALUES (?,?,?,?,?,?,?,?,?,?)
         ON CONFLICT(user_id, steam_appid) DO UPDATE SET
             status=excluded.status, rating=excluded.rating, notes=excluded.notes,
             draft_notes=COALESCE(excluded.draft_notes, game_entries.draft_notes),
-            review=COALESCE(excluded.review, game_entries.review)
-    """, (user["id"], body.steam_appid, body.game_name, body.game_image, body.status, body.rating, body.notes, body.draft_notes, body.review))
+            review=COALESCE(excluded.review, game_entries.review),
+            genres=COALESCE(excluded.genres, game_entries.genres)
+    """, (user["id"], body.steam_appid, body.game_name, body.game_image, body.status, body.rating, body.notes, body.draft_notes, body.review, genres_json))
     db.commit(); db.close()
     return {"ok": True}
 
@@ -834,6 +842,42 @@ def remove_from_list(appid: int, user=Depends(require_auth)):
     db.execute("DELETE FROM game_entries WHERE user_id=? AND steam_appid=?", (user["id"], appid))
     db.commit(); db.close()
     return {"ok": True}
+
+
+@app.post("/api/list/enrich-genres")
+async def enrich_genres(user=Depends(require_auth)):
+    db = get_db()
+    rows = db.execute(
+        "SELECT steam_appid FROM game_entries WHERE user_id=? AND (genres IS NULL OR genres='[]' OR genres='')",
+        (user["id"],)
+    ).fetchall()
+    db.close()
+    appids = [r["steam_appid"] for r in rows]
+    if not appids:
+        return {"enriched": 0}
+
+    async def fetch_genres(appid):
+        try:
+            data = await get(f"{STEAM}/appdetails", {"appids": appid, "l": "english", "cc": "es"})
+            entry = data.get(str(appid), {})
+            if entry.get("success"):
+                return appid, [x["description"] for x in entry["data"].get("genres", [])]
+        except Exception:
+            pass
+        return appid, []
+
+    results = await asyncio.gather(*[fetch_genres(a) for a in appids[:40]])
+    db = get_db()
+    enriched = 0
+    for appid, genres in results:
+        if genres:
+            db.execute(
+                "UPDATE game_entries SET genres=? WHERE user_id=? AND steam_appid=?",
+                (json.dumps(genres), user["id"], appid)
+            )
+            enriched += 1
+    db.commit(); db.close()
+    return {"enriched": enriched}
 
 
 @app.get("/api/stats/me")

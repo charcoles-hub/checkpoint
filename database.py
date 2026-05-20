@@ -74,6 +74,7 @@ def _init_sqlite():
         ("users", "avatar_color", "TEXT"),
         ("users", "avatar_icon", "TEXT"),
         ("users", "avatar_b64", "TEXT"),
+        ("game_entries", "genres", "TEXT"),
     ]:
         try:
             db.execute(f"ALTER TABLE {table} ADD COLUMN {col} {definition}")
@@ -184,6 +185,7 @@ def _init_pg():
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_color TEXT",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_icon TEXT",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_b64 TEXT",
+        "ALTER TABLE game_entries ADD COLUMN IF NOT EXISTS genres TEXT",
     ]
     for m in migrations:
         try:

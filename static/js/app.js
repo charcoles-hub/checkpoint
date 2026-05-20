@@ -655,7 +655,7 @@ async function openModal(gameId) {
       const rating = parseInt(document.getElementById('stars-container').dataset.value) || null;
       const notes = document.getElementById('review-notes').value.trim() || null;
       await AUTH.apiFetch('/api/list', { method: 'POST', body: JSON.stringify({
-        steam_appid: g.id, game_name: g.name, game_image: g.image, status: 'played', rating, notes
+        steam_appid: g.id, game_name: g.name, game_image: g.image, status: 'played', rating, notes, genres: g.genres || []
       })});
       document.getElementById('rating-form').style.display = 'none';
       showToast(rating ? t('toast.saved_rating', {n: rating}) : t('toast.saved'));
@@ -698,7 +698,7 @@ async function openModal(gameId) {
       const status = myEntry?.status || 'wishlist';
       await AUTH.apiFetch('/api/list', { method: 'POST', body: JSON.stringify({
         steam_appid: g.id, game_name: g.name, game_image: g.image,
-        status, rating: myEntry?.rating || null, notes: myEntry?.notes || null, draft_notes: draft
+        status, rating: myEntry?.rating || null, notes: myEntry?.notes || null, draft_notes: draft, genres: g.genres || []
       })});
       showToast(t('toast.draft'));
     });
@@ -793,7 +793,7 @@ async function openModal(gameId) {
 
 async function saveEntry(g, status) {
   await AUTH.apiFetch('/api/list', { method: 'POST', body: JSON.stringify({
-    steam_appid: g.id, game_name: g.name, game_image: g.image, status
+    steam_appid: g.id, game_name: g.name, game_image: g.image, status, genres: g.genres || []
   })});
   if (document.getElementById('view-profile-me').style.display !== 'none') {
     if (profileMeTab === 'mygames') loadMyList();
@@ -1176,15 +1176,44 @@ async function loadMyList() {
 
   document.querySelector('.list-search-box')?.remove();
 
-  // Search bar
   let listSearch = '';
+  let activeGenre = '';
+
+  function buildGenreOptions() {
+    const genreSet = new Set();
+    entries.forEach(e => (e.genres || []).forEach(g => genreSet.add(g)));
+    return [...genreSet].sort();
+  }
+
   const searchBox = document.createElement('div');
   searchBox.className = 'list-search-box';
-  searchBox.innerHTML = `<input type="text" class="field-input" id="list-search" placeholder="${t('mylist.search')}" style="max-width:320px;margin-bottom:16px" />`;
+  searchBox.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px">
+      <input type="text" class="field-input" id="list-search" placeholder="${t('mylist.search')}"
+        style="flex:1;min-width:160px;margin-bottom:0" />
+      <select class="field-input genre-filter-select" id="list-genre-filter"
+        style="flex:0 0 auto;width:auto;min-width:150px;max-width:220px;margin-bottom:0;cursor:pointer">
+        <option value="">${t('mylist.genre_all')}</option>
+      </select>
+    </div>`;
   listGrid.parentNode.insertBefore(searchBox, listGrid);
+
+  function refreshGenreSelect() {
+    const sel = document.getElementById('list-genre-filter');
+    if (!sel) return;
+    const genres = buildGenreOptions();
+    const prev = sel.value;
+    sel.innerHTML = `<option value="">${t('mylist.genre_all')}</option>` +
+      genres.map(g => `<option value="${escHtml(g)}" ${g === prev ? 'selected' : ''}>${escHtml(g)}</option>`).join('');
+    if (!genres.includes(prev)) { sel.value = ''; activeGenre = ''; }
+  }
+  refreshGenreSelect();
+
   searchBox.querySelector('#list-search').addEventListener('input', e => {
-    listSearch = e.target.value.toLowerCase();
-    renderList();
+    listSearch = e.target.value.toLowerCase(); myListPage = 1; renderList();
+  });
+  searchBox.querySelector('#list-genre-filter').addEventListener('change', e => {
+    activeGenre = e.target.value; myListPage = 1; renderList();
   });
 
   let myListPage = 1;
@@ -1195,6 +1224,7 @@ async function loadMyList() {
     searchBox.style.display = '';
     let filtered = activeStatus === 'all' ? entries.filter(e => e.status !== 'wishlist') : entries.filter(e => e.status === activeStatus);
     if (listSearch) filtered = filtered.filter(e => (e.game_name || '').toLowerCase().includes(listSearch));
+    if (activeGenre) filtered = filtered.filter(e => (e.genres || []).includes(activeGenre));
 
     document.getElementById('mylist-pagination')?.remove();
     listGrid.innerHTML = '';
@@ -1246,6 +1276,18 @@ async function loadMyList() {
   });
 
   renderList();
+
+  AUTH.apiFetch('/api/list/enrich-genres', { method: 'POST' }).then(({ enriched }) => {
+    if (enriched > 0) {
+      AUTH.apiFetch('/api/list').then(fresh => {
+        fresh.forEach(f => {
+          const e = entries.find(x => x.steam_appid === f.steam_appid);
+          if (e) e.genres = f.genres;
+        });
+        refreshGenreSelect();
+      });
+    }
+  }).catch(() => {});
 }
 
 async function loadWishlist() {
@@ -1260,18 +1302,54 @@ async function loadWishlist() {
     const [entries, alerts] = await Promise.all([AUTH.apiFetch('/api/list'), fetchAlerts]);
     const wishlist = entries.filter(e => e.status === 'wishlist');
     let wPage = 1;
+    let wGenre = '';
     const W_PAGE = 21;
+
+    function buildWGenreOptions() {
+      const genreSet = new Set();
+      wishlist.forEach(e => (e.genres || []).forEach(g => genreSet.add(g)));
+      return [...genreSet].sort();
+    }
+
+    document.querySelector('.wishlist-genre-wrap')?.remove();
+    const wGenreWrap = document.createElement('div');
+    wGenreWrap.className = 'wishlist-genre-wrap';
+    wGenreWrap.style.cssText = 'margin-bottom:16px';
+    wGenreWrap.innerHTML = `
+      <select class="field-input genre-filter-select" id="wishlist-genre-filter"
+        style="width:auto;min-width:150px;max-width:220px;cursor:pointer;margin-bottom:0">
+        <option value="">${t('mylist.genre_all')}</option>
+      </select>`;
+    wGrid.parentNode.insertBefore(wGenreWrap, wGrid);
+
+    function refreshWGenreSelect() {
+      const sel = document.getElementById('wishlist-genre-filter');
+      if (!sel) return;
+      const genres = buildWGenreOptions();
+      const prev = sel.value;
+      sel.innerHTML = `<option value="">${t('mylist.genre_all')}</option>` +
+        genres.map(g => `<option value="${escHtml(g)}" ${g === prev ? 'selected' : ''}>${escHtml(g)}</option>`).join('');
+      if (!genres.includes(prev)) { sel.value = ''; wGenre = ''; }
+    }
+    refreshWGenreSelect();
+
+    wGenreWrap.querySelector('#wishlist-genre-filter').addEventListener('change', e => {
+      wGenre = e.target.value; wPage = 1; renderWishlist();
+    });
 
     function renderWishlist() {
       document.getElementById('wishlist-pagination')?.remove();
       wGrid.innerHTML = '';
-      if (!wishlist.length) {
-        wGrid.innerHTML = `<div class="empty-state"><div class="empty-icon">⭐</div><h3>${t('wishlist.empty_title')}</h3><p>${t('wishlist.empty_desc')}</p></div>`;
+      const visible = wGenre ? wishlist.filter(e => (e.genres || []).includes(wGenre)) : wishlist;
+      if (!visible.length) {
+        wGrid.innerHTML = wishlist.length === 0
+          ? `<div class="empty-state"><div class="empty-icon">⭐</div><h3>${t('wishlist.empty_title')}</h3><p>${t('wishlist.empty_desc')}</p></div>`
+          : `<div class="no-results">${t('mylist.no_category')}</div>`;
         return;
       }
-      const totalPages = Math.ceil(wishlist.length / W_PAGE);
+      const totalPages = Math.ceil(visible.length / W_PAGE);
       if (wPage > totalPages) wPage = 1;
-      wishlist.slice((wPage - 1) * W_PAGE, wPage * W_PAGE).forEach(e => wGrid.appendChild(renderCard(e, () => openModal(e.steam_appid), async () => {
+      visible.slice((wPage - 1) * W_PAGE, wPage * W_PAGE).forEach(e => wGrid.appendChild(renderCard(e, () => openModal(e.steam_appid), async () => {
         await AUTH.apiFetch(`/api/list/${e.steam_appid}`, { method: 'DELETE' });
         loadWishlist();
         showToast(t('toast.game_removed'));

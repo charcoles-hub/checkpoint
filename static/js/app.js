@@ -238,6 +238,10 @@ async function loadGames() {
           .filter(g => g.avg_rating)
           .sort((a, b) => (b.avg_rating || 0) - (a.avg_rating || 0));
       }
+    } else if (currentSort === 'community' && !currentSearch) {
+      // Community-rated sort on home: pull from ranking endpoint
+      const ranking = await AUTH.apiFetch('/api/ranking');
+      data = { results: ranking.map(g => ({ ...g, id: g.steam_appid })), count: ranking.length };
     } else {
       // Normal search/browse
       const params = new URLSearchParams({ page: currentPage });

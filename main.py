@@ -1370,13 +1370,11 @@ async def games_by_genre(genre_key: str, page: int = 1):
     genre_key = unquote(genre_key)
     categories = await get_category_list()
     genre_info = next((c for c in categories if c["key"] == genre_key), {})
-    cache_key = f"genre_detail_spy:{genre_key}:{page}"
+    spy_type = genre_info.get("spy_type", "genre")
+    spy_slug = genre_info.get("spy_slug", genre_key.lower())
+    cache_key = f"genre_detail_spy:{spy_type}:{spy_slug}:{page}"
 
-    data = await steamspy_games_page(
-        genre_info.get("spy_type", "genre"),
-        genre_info.get("spy_slug", genre_key.lower()),
-        page, cache_key,
-    )
+    data = await steamspy_games_page(spy_type, spy_slug, page, cache_key)
 
     appids = [g["id"] for g in data["results"]]
     db = get_db()
@@ -1399,19 +1397,18 @@ async def games_by_genre(genre_key: str, page: int = 1):
 @app.get("/api/genres/{genre_key}/ranking")
 async def genre_community_ranking(genre_key: str):
     genre_key = unquote(genre_key)
-    cache_key = f"genre_ranking_spy:{genre_key}"
-    cached = cache_get(cache_key)
-    if cached is not None:
-        return cached
-
     categories = await get_category_list()
     genre_info = next((c for c in categories if c["key"] == genre_key), {})
     spy_type = genre_info.get("spy_type", "genre")
     spy_slug = genre_info.get("spy_slug", genre_key.lower())
+    cache_key = f"genre_ranking_spy:{spy_type}:{spy_slug}"
+    cached = cache_get(cache_key)
+    if cached is not None:
+        return cached
 
     # Fetch 5 pages using same criteria as the listing tab (already cached)
     pages_data = await asyncio.gather(*[
-        steamspy_games_page(spy_type, spy_slug, p, f"genre_detail_spy:{genre_key}:{p}")
+        steamspy_games_page(spy_type, spy_slug, p, f"genre_detail_spy:{spy_type}:{spy_slug}:{p}")
         for p in range(1, 6)
     ])
 

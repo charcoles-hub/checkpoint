@@ -92,7 +92,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
             "font-src https://fonts.gstatic.com; "
             "img-src 'self' https://cdn.akamai.steamstatic.com https://media.steampowered.com "
-            "https://steamcdn-a.akamaihd.net https://shared.steamstatic.com https://media.rawg.io data: blob:; "
+            "https://steamcdn-a.akamaihd.net https://shared.steamstatic.com data: blob:; "
             "connect-src 'self'; "
             "frame-ancestors 'none';"
         )
@@ -104,8 +104,7 @@ app.add_middleware(SecurityHeadersMiddleware)
 STEAM = "https://store.steampowered.com/api"
 STEAMSPY = "https://steamspy.com/api.php"
 CDN = "https://cdn.akamai.steamstatic.com/steam/apps"
-RAWG = "https://api.rawg.io/api"
-RAWG_KEY = os.getenv("RAWG_API_KEY", "")
+STEAM_STORE_SEARCH = "https://store.steampowered.com/api/storesearch/"
 _NSFW_TAGS = {"nsfw", "sexual-content", "nudity", "hentai", "adult", "eroge", "18+", "ecchi"}
 
 
@@ -162,56 +161,29 @@ def cache_set(key: str, data, ttl_hours: float = 24):
     db.commit()
     db.close()
 
-async def resolve_steam_appid(rawg_id: int) -> int | None:
-    """RAWG game ID → Steam appid. Cacheado permanentemente en DB."""
-    cache_key = f"rawg_steam:{rawg_id}"
-    cached = cache_get(cache_key)
-    if cached is not None:
-        return cached.get("appid")
-    try:
-        data = await get(f"{RAWG}/games/{rawg_id}/stores", {"key": RAWG_KEY})
-        for store in data.get("results", []):
-            if store.get("store_id") == 1:
-                m = re.search(r"/app/(\d+)", store.get("url", ""))
-                if m:
-                    appid = int(m.group(1))
-                    cache_set(cache_key, {"appid": appid}, ttl_hours=8760)
-                    return appid
-    except Exception:
-        pass
-    cache_set(cache_key, {"appid": None}, ttl_hours=24)
-    return None
-
-async def rawg_games_page(rawg_type: str, rawg_slug: str, page: int, cache_key: str):
-    """Página de juegos de RAWG filtrada a juegos con Steam appid. Cacheado 24h en DB."""
+async def steamspy_games_page(spy_type: str, spy_slug: str, page: int, cache_key: str):
+    """Página de juegos de SteamSpy por género/tag. Cacheado 24h en DB."""
     cached = cache_get(cache_key)
     if cached is not None:
         return cached
-    try:
-        data = await get(f"{RAWG}/games", {
-            "key": RAWG_KEY, rawg_type: rawg_slug,
-            "page": page, "page_size": 40,
-            "ordering": "-metacritic", "platforms": 4,
-            "metacritic": "60,100",
-        })
-        results = data.get("results", [])
-        total = data.get("count", 0)
-        results = [g for g in results if not any(t["slug"] in _NSFW_TAGS for t in g.get("tags", []))]
-        appids = await asyncio.gather(*[resolve_steam_appid(g["id"]) for g in results])
-        games = []
-        for g, appid in zip(results, appids):
-            if not appid:
-                continue
-            games.append({
-                "id": appid, "name": g["name"],
-                "image": img(appid),
-                "playtime": 0, "price": None,
-            })
-        out = {"results": games, "count": total}
-        cache_set(cache_key, out, ttl_hours=24)
-        return out
-    except Exception:
-        return {"results": [], "count": 0}
+    list_key = f"spy_list:{spy_type}:{spy_slug}"
+    all_games = cache_get(list_key)
+    if all_games is None:
+        try:
+            data = await get(STEAMSPY, {"request": spy_type, spy_type: spy_slug})
+            all_games = [
+                {"id": g["appid"], "name": g["name"], "image": img(g["appid"]),
+                 "playtime": round(g.get("average_forever", 0) / 60, 1), "price": None}
+                for g in data.values() if g.get("appid")
+            ]
+            cache_set(list_key, all_games, ttl_hours=24)
+        except Exception:
+            all_games = []
+    ps = 40
+    s = (page - 1) * ps
+    out = {"results": all_games[s:s + ps], "count": len(all_games)}
+    cache_set(cache_key, out, ttl_hours=24)
+    return out
 
 
 # ── Games ──────────────────────────────────────────────
@@ -222,17 +194,11 @@ async def list_games(search: str = "", page: int = 1):
         cached = cache_get(cache_key)
         if cached is not None:
             return cached
-        data = await get(f"{RAWG}/games", {
-            "key": RAWG_KEY, "search": search,
-            "page_size": 20, "platforms": 4,
-            "search_precise": True,
-        })
-        results = data.get("results", [])
-        results = [g for g in results if not any(t["slug"] in _NSFW_TAGS for t in g.get("tags", []))]
-        appids = await asyncio.gather(*[resolve_steam_appid(g["id"]) for g in results])
+        data = await get(STEAM_STORE_SEARCH, {"term": search, "l": "english", "cc": "es", "nr": "1"})
+        items = data.get("items", [])
         games = [
-            {"id": appid, "name": g["name"], "image": img(appid)}
-            for g, appid in zip(results, appids) if appid
+            {"id": item["id"], "name": item["name"], "image": img(item["id"])}
+            for item in items if item.get("type") != "dlc"
         ]
         out = {"results": games, "count": len(games)}
         cache_set(cache_key, out, ttl_hours=1)
@@ -680,7 +646,7 @@ def global_activity():
 @app.get("/api/admin/clear-cache")
 def clear_cache():
     db = get_db()
-    db.execute("DELETE FROM api_cache WHERE key LIKE ? OR key LIKE ?", ('genre_%', 'rawg_categories%'))
+    db.execute("DELETE FROM api_cache WHERE key LIKE ? OR key LIKE ?", ('genre_%', 'spy_list:%'))
     db.commit()
     db.close()
     return {"ok": True}
@@ -1333,33 +1299,32 @@ async def sync_premium_steam_libraries():
 from fastapi.responses import FileResponse
 from urllib.parse import unquote
 
-# Traducciones ES y emojis para slugs conocidos de RAWG
 _CURATED_CATEGORIES = [
-    # Géneros oficiales RAWG
-    {"name": "Acción",            "key": "action",                 "emoji": "⚔️",  "rawg_type": "genres", "rawg_slug": "action"},
-    {"name": "RPG",               "key": "role-playing-games-rpg", "emoji": "🧙",  "rawg_type": "genres", "rawg_slug": "role-playing-games-rpg"},
-    {"name": "Aventura",          "key": "adventure",              "emoji": "🗺️",  "rawg_type": "genres", "rawg_slug": "adventure"},
-    {"name": "Estrategia",        "key": "strategy",               "emoji": "♟️",  "rawg_type": "genres", "rawg_slug": "strategy"},
-    {"name": "Shooter",           "key": "shooter",                "emoji": "🔫",  "rawg_type": "genres", "rawg_slug": "shooter"},
-    {"name": "Plataformas",       "key": "platformer",             "emoji": "🦘",  "rawg_type": "genres", "rawg_slug": "platformer"},
-    {"name": "Simulación",        "key": "simulation",             "emoji": "🛠️",  "rawg_type": "genres", "rawg_slug": "simulation"},
-    {"name": "Deportes",          "key": "sports",                 "emoji": "⚽",  "rawg_type": "genres", "rawg_slug": "sports"},
-    {"name": "Carreras",          "key": "racing",                 "emoji": "🏎️",  "rawg_type": "genres", "rawg_slug": "racing"},
-    {"name": "Lucha",             "key": "fighting",               "emoji": "🥊",  "rawg_type": "genres", "rawg_slug": "fighting"},
-    {"name": "Puzzle",            "key": "puzzle",                 "emoji": "🧩",  "rawg_type": "genres", "rawg_slug": "puzzle"},
-    {"name": "Indie",             "key": "indie",                  "emoji": "🎨",  "rawg_type": "genres", "rawg_slug": "indie"},
+    # Géneros SteamSpy
+    {"name": "Acción",            "key": "action",                 "emoji": "⚔️",  "spy_type": "genre", "spy_slug": "Action"},
+    {"name": "RPG",               "key": "role-playing-games-rpg", "emoji": "🧙",  "spy_type": "genre", "spy_slug": "RPG"},
+    {"name": "Aventura",          "key": "adventure",              "emoji": "🗺️",  "spy_type": "genre", "spy_slug": "Adventure"},
+    {"name": "Estrategia",        "key": "strategy",               "emoji": "♟️",  "spy_type": "genre", "spy_slug": "Strategy"},
+    {"name": "Shooter",           "key": "shooter",                "emoji": "🔫",  "spy_type": "tag",   "spy_slug": "Shooter"},
+    {"name": "Plataformas",       "key": "platformer",             "emoji": "🦘",  "spy_type": "tag",   "spy_slug": "Platformer"},
+    {"name": "Simulación",        "key": "simulation",             "emoji": "🛠️",  "spy_type": "genre", "spy_slug": "Simulation"},
+    {"name": "Deportes",          "key": "sports",                 "emoji": "⚽",  "spy_type": "genre", "spy_slug": "Sports"},
+    {"name": "Carreras",          "key": "racing",                 "emoji": "🏎️",  "spy_type": "genre", "spy_slug": "Racing"},
+    {"name": "Lucha",             "key": "fighting",               "emoji": "🥊",  "spy_type": "tag",   "spy_slug": "Fighting"},
+    {"name": "Puzzle",            "key": "puzzle",                 "emoji": "🧩",  "spy_type": "tag",   "spy_slug": "Puzzle"},
+    {"name": "Indie",             "key": "indie",                  "emoji": "🎨",  "spy_type": "genre", "spy_slug": "Indie"},
     # Tags de discovery
-    {"name": "Mundo Abierto",     "key": "open-world",             "emoji": "🌍",  "rawg_type": "tags",   "rawg_slug": "open-world"},
-    {"name": "Terror",            "key": "horror",                 "emoji": "👻",  "rawg_type": "tags",   "rawg_slug": "horror"},
-    {"name": "Supervivencia",     "key": "survival",               "emoji": "🌿",  "rawg_type": "tags",   "rawg_slug": "survival"},
-    {"name": "Roguelike",         "key": "roguelike",              "emoji": "🎲",  "rawg_type": "tags",   "rawg_slug": "roguelike"},
-    {"name": "Co-op",             "key": "co-op",                  "emoji": "🤝",  "rawg_type": "tags",   "rawg_slug": "co-op"},
-    {"name": "Multijugador",      "key": "multiplayer",            "emoji": "👥",  "rawg_type": "tags",   "rawg_slug": "multiplayer"},
-    {"name": "Ciencia Ficción",   "key": "sci-fi",                 "emoji": "🚀",  "rawg_type": "tags",   "rawg_slug": "sci-fi"},
-    {"name": "Fantasía",          "key": "fantasy",                "emoji": "🧝",  "rawg_type": "tags",   "rawg_slug": "fantasy"},
-    {"name": "Sigilo",            "key": "stealth",                "emoji": "🕵️",  "rawg_type": "tags",   "rawg_slug": "stealth"},
-    {"name": "Metroidvania",      "key": "metroidvania",           "emoji": "🗡️",  "rawg_type": "tags",   "rawg_slug": "metroidvania"},
-    {"name": "Acceso Anticipado", "key": "early-access",           "emoji": "🚧",  "rawg_type": "tags",   "rawg_slug": "early-access"},
+    {"name": "Mundo Abierto",     "key": "open-world",             "emoji": "🌍",  "spy_type": "tag",   "spy_slug": "Open World"},
+    {"name": "Terror",            "key": "horror",                 "emoji": "👻",  "spy_type": "tag",   "spy_slug": "Horror"},
+    {"name": "Supervivencia",     "key": "survival",               "emoji": "🌿",  "spy_type": "tag",   "spy_slug": "Survival"},
+    {"name": "Roguelike",         "key": "roguelike",              "emoji": "🎲",  "spy_type": "tag",   "spy_slug": "Rogue-like"},
+    {"name": "Co-op",             "key": "co-op",                  "emoji": "🤝",  "spy_type": "tag",   "spy_slug": "Co-op"},
+    {"name": "Multijugador",      "key": "multiplayer",            "emoji": "👥",  "spy_type": "tag",   "spy_slug": "Multiplayer"},
+    {"name": "Ciencia Ficción",   "key": "sci-fi",                 "emoji": "🚀",  "spy_type": "tag",   "spy_slug": "Sci-fi"},
+    {"name": "Fantasía",          "key": "fantasy",                "emoji": "🧝",  "spy_type": "tag",   "spy_slug": "Fantasy"},
+    {"name": "Sigilo",            "key": "stealth",                "emoji": "🕵️",  "spy_type": "tag",   "spy_slug": "Stealth"},
+    {"name": "Metroidvania",      "key": "metroidvania",           "emoji": "🗡️",  "spy_type": "tag",   "spy_slug": "Metroidvania"},
+    {"name": "Acceso Anticipado", "key": "early-access",           "emoji": "🚧",  "spy_type": "tag",   "spy_slug": "Early Access"},
 ]
 
 async def get_category_list() -> list:
@@ -1381,16 +1346,12 @@ async def genres_previews():
         if cached is not None:
             return cached
         try:
-            data = await get(f"{RAWG}/games", {
-                "key": RAWG_KEY, genre["rawg_type"]: genre["rawg_slug"],
-                "page_size": 1, "ordering": "-rating", "platforms": 4,
-            })
-            results = data.get("results", [])
-            first = results[0] if results else None
+            data = await get(STEAMSPY, {"request": genre["spy_type"], genre["spy_type"]: genre["spy_slug"]})
+            games = [g for g in data.values() if g.get("appid")]
             out = {
                 "key": genre["key"],
-                "count": data.get("count", 0),
-                "cover_img": first.get("background_image") if first else None,
+                "count": len(games),
+                "cover_img": img(games[0]["appid"]) if games else None,
             }
             cache_set(cache_key, out, ttl_hours=24)
             return out
@@ -1408,9 +1369,9 @@ async def games_by_genre(genre_key: str, page: int = 1):
     genre_info = next((c for c in categories if c["key"] == genre_key), {})
     cache_key = f"genre_detail:{genre_key}:{page}"
 
-    data = await rawg_games_page(
-        genre_info.get("rawg_type", "genres"),
-        genre_info.get("rawg_slug", genre_key.lower()),
+    data = await steamspy_games_page(
+        genre_info.get("spy_type", "genre"),
+        genre_info.get("spy_slug", genre_key.lower()),
         page, cache_key,
     )
 
@@ -1442,12 +1403,12 @@ async def genre_community_ranking(genre_key: str):
 
     categories = await get_category_list()
     genre_info = next((c for c in categories if c["key"] == genre_key), {})
-    rawg_type = genre_info.get("rawg_type", "genres")
-    rawg_slug = genre_info.get("rawg_slug", genre_key.lower())
+    spy_type = genre_info.get("spy_type", "genre")
+    spy_slug = genre_info.get("spy_slug", genre_key.lower())
 
     # Fetch 5 pages using same criteria as the listing tab (already cached)
     pages_data = await asyncio.gather(*[
-        rawg_games_page(rawg_type, rawg_slug, p, f"genre_detail:{genre_key}:{p}")
+        steamspy_games_page(spy_type, spy_slug, p, f"genre_detail:{genre_key}:{p}")
         for p in range(1, 6)
     ])
 

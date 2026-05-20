@@ -328,6 +328,32 @@ def update_profile(request: Request, body: ProfileIn, user=Depends(require_auth)
 AVATAR_MAX_BYTES = 2 * 1024 * 1024  # 2 MB
 AVATAR_ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp"}
 AVATAR_SIZE = 128  # px
+SIGHTENGINE_USER   = os.getenv("SIGHTENGINE_USER")
+SIGHTENGINE_SECRET = os.getenv("SIGHTENGINE_SECRET")
+
+async def _check_image_content(data: bytes) -> None:
+    """Raise 400 if Sightengine flags the image. No-op if keys not configured."""
+    if not SIGHTENGINE_USER or not SIGHTENGINE_SECRET:
+        return
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            r = await client.post(
+                "https://api.sightengine.com/1.0/check.json",
+                data={"models": "nudity-2.0,violence", "api_user": SIGHTENGINE_USER, "api_secret": SIGHTENGINE_SECRET},
+                files={"media": ("avatar", data, "image/jpeg")},
+            )
+        result = r.json()
+        if result.get("status") != "success":
+            return
+        nudity = result.get("nudity", {})
+        if max(nudity.get("sexual_activity", 0), nudity.get("sexual_display", 0), nudity.get("erotica", 0)) > 0.5:
+            raise HTTPException(400, "Imagen rechazada: contenido para adultos detectado")
+        if result.get("violence", {}).get("prob", 0) > 0.7:
+            raise HTTPException(400, "Imagen rechazada: contenido violento detectado")
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[sightengine] error: {e}")  # fallo silencioso — no bloqueamos el upload
 
 @app.post("/api/auth/avatar")
 async def upload_avatar(file: UploadFile = File(...), user=Depends(require_auth)):
@@ -338,11 +364,11 @@ async def upload_avatar(file: UploadFile = File(...), user=Depends(require_auth)
     data = await file.read()
     if len(data) > AVATAR_MAX_BYTES:
         raise HTTPException(400, "La imagen no puede superar los 2 MB")
+    await _check_image_content(data)
     try:
         from PIL import Image
         img = Image.open(io.BytesIO(data)).convert("RGB")
         img.thumbnail((AVATAR_SIZE, AVATAR_SIZE), Image.LANCZOS)
-        # Crop to square from center
         w, h = img.size
         side = min(w, h)
         left, top = (w - side) // 2, (h - side) // 2

@@ -69,6 +69,7 @@ async def lifespan(app: FastAPI):
     init_db()
     asyncio.create_task(alert_loop())
     asyncio.create_task(wishlist_price_loop())
+    asyncio.create_task(steam_autosync_loop())
     yield
 
 
@@ -491,7 +492,7 @@ def update_settings(body: dict, user=Depends(require_auth)):
     return {"ok": True}
 
 
-def _pub(u): return {"id": u["id"], "username": u["username"], "email": u["email"], "notify_ntfy": u.get("notify_ntfy"), "is_premium": bool(u.get("is_premium", 0)), "steam_id": u.get("steam_id"), "bio": u.get("bio") or "", "username_changed_at": _dt_str(u.get("username_changed_at")), "avatar_color": u.get("avatar_color") or "", "avatar_icon": u.get("avatar_icon") or "", "avatar_b64": u.get("avatar_b64") or ""}
+def _pub(u): return {"id": u["id"], "username": u["username"], "email": u["email"], "notify_ntfy": u.get("notify_ntfy"), "is_premium": bool(u.get("is_premium", 0)), "steam_id": u.get("steam_id"), "bio": u.get("bio") or "", "username_changed_at": _dt_str(u.get("username_changed_at")), "avatar_color": u.get("avatar_color") or "", "avatar_icon": u.get("avatar_icon") or "", "avatar_b64": u.get("avatar_b64") or "", "last_steam_sync": _dt_str(u.get("last_steam_sync"))}
 
 
 def _parse_dt(val):
@@ -1273,6 +1274,58 @@ async def wishlist_price_loop():
         except Exception as e:
             print(f"[prices] error: {e}")
         await asyncio.sleep(3600 * 24)
+
+
+async def steam_autosync_loop():
+    await asyncio.sleep(120)  # primera ejecución 2 min tras arranque
+    while True:
+        print("[steam-sync] syncing premium users...")
+        try:
+            await sync_premium_steam_libraries()
+        except Exception as e:
+            print(f"[steam-sync] error: {e}")
+        await asyncio.sleep(3600 * 24)
+
+
+async def sync_premium_steam_libraries():
+    if not STEAM_API_KEY:
+        return
+    db = get_db()
+    try:
+        users = db.execute(
+            "SELECT id, steam_id FROM users WHERE is_premium=1 AND steam_id IS NOT NULL AND steam_id != ''"
+        ).fetchall()
+    finally:
+        db.close()
+
+    for u in users:
+        try:
+            sid = u["steam_id"]
+            data = await get(f"{STEAM_API}/IPlayerService/GetOwnedGames/v1/", {
+                "key": STEAM_API_KEY, "steamid": sid,
+                "include_appinfo": "true", "include_played_free_games": "true",
+            })
+            games = data.get("response", {}).get("games", [])
+            if not games:
+                continue
+            db2 = get_db()
+            try:
+                for g in games:
+                    if g.get("playtime_forever", 0) == 0:
+                        continue
+                    image = f"{CDN}/{g['appid']}/header.jpg"
+                    db2.execute("""
+                        INSERT INTO game_entries (user_id, steam_appid, game_name, game_image, status, playtime)
+                        VALUES (?,?,?,?,?,?)
+                        ON CONFLICT(user_id, steam_appid) DO UPDATE SET playtime=excluded.playtime
+                    """, (u["id"], g["appid"], g.get("name", f"App {g['appid']}"), image, "library", g["playtime_forever"]))
+                db2.execute("UPDATE users SET last_steam_sync=CURRENT_TIMESTAMP WHERE id=?", (u["id"],))
+                db2.commit()
+                print(f"[steam-sync] synced user {u['id']} ({len(games)} games)")
+            finally:
+                db2.close()
+        except Exception as e:
+            print(f"[steam-sync] skipping user {u['id']}: {e}")
 
 
 

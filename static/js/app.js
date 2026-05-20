@@ -1872,8 +1872,22 @@ async function openSteamImport(steamId) {
 function loadSteamTab() {
   const el = document.getElementById('steam-tab-content');
   const steamId = AUTH.user?.steam_id || '';
+  const lastSync = AUTH.user?.last_steam_sync;
+  const isPremium = AUTH.user?.is_premium;
+  const syncBadge = isPremium && steamId ? `
+    <div style="display:flex;align-items:center;gap:8px;background:color-mix(in srgb,var(--cyan) 12%,transparent);border:1px solid color-mix(in srgb,var(--cyan) 30%,transparent);border-radius:8px;padding:10px 14px;margin-bottom:20px;font-size:0.88rem">
+      <span style="color:var(--cyan);font-size:1rem">🔄</span>
+      <div>
+        <span style="color:var(--cyan);font-weight:600">${t('steam.autosync_active')}</span>
+        <span style="color:var(--muted);margin-left:8px;font-size:0.82rem">${lastSync ? t('steam.autosync_last', {date: new Date(lastSync).toLocaleDateString()}) : t('steam.autosync_pending')}</span>
+      </div>
+    </div>` : isPremium && !steamId ? `
+    <div style="background:color-mix(in srgb,var(--cyan) 8%,transparent);border:1px solid color-mix(in srgb,var(--cyan) 20%,transparent);border-radius:8px;padding:10px 14px;margin-bottom:20px;font-size:0.85rem;color:var(--muted)">
+      ${t('steam.autosync_hint')}
+    </div>` : '';
   el.innerHTML = `
     <div style="max-width:480px">
+      ${syncBadge}
       ${steamId ? `<p style="color:var(--muted);font-size:0.88rem;margin-bottom:12px">${t('steam.connected', {id: escHtml(steamId)})}</p>` : ''}
       <label class="field-label">${t('settings.steam_label')}</label>
       <input type="text" id="steam-id-tab" class="field-input" value="${escHtml(steamId)}"
@@ -2150,7 +2164,7 @@ const TOUR_STEPS = [
   { target: '#nav-ranking',  get title() { return t('tour.step4.title'); }, get text() { return t('tour.step4.text'); }, pos: 'bottom' },
   { target: '#nav-community',get title() { return t('tour.step5.title'); }, get text() { return t('tour.step5.text'); }, pos: 'bottom' },
   { target: '#nav-ideas',    get title() { return t('tour.step6.title'); }, get text() { return t('tour.step6.text'); }, pos: 'bottom' },
-  { target: null,            get title() { return t('tour.step7.title'); }, get text() { return t('tour.step7.text'); } },
+  { target: '#btn-premium-menu', get title() { return t('tour.step7.title'); }, get text() { return t('tour.step7.text'); }, pos: 'bottom' },
   { target: '#btn-register', get title() { return t('tour.step8.title'); }, get text() { return t('tour.step8.text'); }, pos: 'bottom', cta: true },
 ];
 

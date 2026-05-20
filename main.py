@@ -1416,30 +1416,52 @@ async def genre_community_ranking(genre_key: str):
     if cached is not None:
         return cached
 
-    # Fetch 5 pages using same criteria as the listing tab (already cached)
-    pages_data = await asyncio.gather(*[
-        steamspy_games_page(spy_type, spy_slug, p, f"genre_detail_spy:{spy_type}:{spy_slug}:{p}")
-        for p in range(1, 6)
-    ])
-
-    steam_appids = list({g["id"] for page_data in pages_data for g in page_data.get("results", [])})
-
-    if not steam_appids:
-        return []
-
-    # Query community ratings for those appids
     db = get_db()
-    placeholders = ",".join(["?"] * len(steam_appids))
-    rows = db.execute(
-        f"SELECT steam_appid, game_name, game_image, "
-        f"ROUND(AVG(rating),1) as avg_rating, COUNT(*) as votes "
-        f"FROM game_entries "
-        f"WHERE rating IS NOT NULL AND status='played' AND steam_appid IN ({placeholders}) "
-        f"GROUP BY steam_appid, game_name, game_image "
-        f"ORDER BY avg_rating DESC, votes DESC",
-        steam_appids
-    ).fetchall()
-    db.close()
+    if spy_type == "genre":
+        # Para géneros oficiales de Steam (Action, RPG…) usamos la columna genres
+        # de game_entries, que viene del API de Steam y es la misma fuente que las
+        # tarjetas de juego — no depende de SteamSpy ni de listas de appids.
+        rows = db.execute(
+            "SELECT steam_appid, game_name, game_image, "
+            "ROUND(AVG(rating),1) as avg_rating, COUNT(*) as votes "
+            "FROM game_entries "
+            "WHERE rating IS NOT NULL AND status='played' AND genres LIKE ? "
+            "GROUP BY steam_appid, game_name, game_image "
+            "ORDER BY avg_rating DESC, votes DESC",
+            (f'%"{spy_slug}"%',)
+        ).fetchall()
+        db.close()
+    else:
+        # Para tags (Horror, Survival…) usamos spy_list: una sola llamada a SteamSpy
+        db.close()
+        list_key = f"spy_list:{spy_type}:{spy_slug}"
+        all_games = cache_get(list_key)
+        if all_games is None:
+            try:
+                data = await get(STEAMSPY, {"request": spy_type, spy_type: spy_slug})
+                all_games = [
+                    {"id": g["appid"], "name": g["name"], "image": img(g["appid"]),
+                     "playtime": round(g.get("average_forever", 0) / 60, 1), "price": None}
+                    for g in data.values() if g.get("appid")
+                ]
+                cache_set(list_key, all_games, ttl_hours=24)
+            except Exception:
+                return []
+        steam_appids = [g["id"] for g in all_games[:2000]]
+        if not steam_appids:
+            return []
+        db = get_db()
+        placeholders = ",".join(["?"] * len(steam_appids))
+        rows = db.execute(
+            f"SELECT steam_appid, game_name, game_image, "
+            f"ROUND(AVG(rating),1) as avg_rating, COUNT(*) as votes "
+            f"FROM game_entries "
+            f"WHERE rating IS NOT NULL AND status='played' AND steam_appid IN ({placeholders}) "
+            f"GROUP BY steam_appid, game_name, game_image "
+            f"ORDER BY avg_rating DESC, votes DESC",
+            steam_appids
+        ).fetchall()
+        db.close()
 
     result = [dict(r) for r in rows]
     if result:

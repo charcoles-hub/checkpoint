@@ -98,6 +98,8 @@ app.add_middleware(SecurityHeadersMiddleware)
 STEAM = "https://store.steampowered.com/api"
 STEAMSPY = "https://steamspy.com/api.php"
 CDN = "https://cdn.akamai.steamstatic.com/steam/apps"
+ITAD_KEY = os.getenv("ITAD_API_KEY", "")
+ITAD_BASE = "https://api.isthereanydeal.com"
 
 
 def img(appid): return f"{CDN}/{appid}/header.jpg"
@@ -737,36 +739,58 @@ def delete_alert(appid: int, user=Depends(require_auth)):
     return {"ok": True}
 
 
+async def _itad_history(appid: int) -> list:
+    """Fetch full price history from IsThereAnyDeal API."""
+    if not ITAD_KEY:
+        return []
+    try:
+        async with httpx.AsyncClient(timeout=12) as c:
+            r = await c.get(f"{ITAD_BASE}/games/lookup/v1", params={"key": ITAD_KEY, "appid": appid})
+            if not r.is_success:
+                return []
+            game_id = r.json().get("game", {}).get("id")
+            if not game_id:
+                return []
+            r = await c.get(f"{ITAD_BASE}/games/pricehistory/v1", params={
+                "key": ITAD_KEY, "id": game_id, "country": "ES", "shops": "steam"
+            })
+            if not r.is_success:
+                return []
+        history = []
+        for shop in r.json():
+            if isinstance(shop, dict) and shop.get("shop", {}).get("id") == "steam":
+                for deal in shop.get("deals", []):
+                    price = deal.get("price", {}).get("amount")
+                    ts = deal.get("timestamp")
+                    if price is not None and ts is not None:
+                        history.append({
+                            "price": price,
+                            "date": datetime.utcfromtimestamp(ts).strftime("%Y-%m-%dT%H:%M:%SZ")
+                        })
+                break
+        return sorted(history, key=lambda x: x["date"])
+    except Exception:
+        return []
+
+
 @app.get("/api/games/{appid}/price-history")
 async def price_history(appid: int, user=Depends(require_auth)):
-    db = get_db()
-    entry = db.execute(
-        "SELECT game_name FROM game_entries WHERE user_id=? AND steam_appid=? AND status='wishlist'",
-        (user["id"], appid)
-    ).fetchone()
-    db.close()
-    if not entry:
-        raise HTTPException(403, "Solo disponible para juegos en tu Wishlist")
+    if not user.get("is_premium"):
+        raise HTTPException(403, "Feature exclusiva de Premium")
 
-    game_name = dict(entry)["game_name"]
-    from alerts import get_price
-    current = await get_price(appid)
-    if current is not None:
-        db = get_db()
-        db.execute(
-            "INSERT INTO price_history (steam_appid, game_name, price_eur) VALUES (?, ?, ?)",
-            (appid, game_name, current)
-        )
-        db.commit(); db.close()
+    history = await _itad_history(appid)
+    if history:
+        return {"history": history, "source": "itad"}
 
+    # Fallback: datos propios del alert checker
     db = get_db()
-    limit = 90 if user.get("is_premium") else 3
     rows = db.execute(
-        "SELECT price_eur, checked_at FROM price_history WHERE steam_appid=? ORDER BY checked_at ASC LIMIT ?",
-        (appid, limit)
+        "SELECT price_eur AS price, checked_at AS date FROM price_history "
+        "WHERE steam_appid=? ORDER BY checked_at ASC",
+        (appid,)
     ).fetchall()
     db.close()
-    return {"history": [dict(r) for r in rows], "is_premium": bool(user.get("is_premium"))}
+    return {"history": [dict(r) for r in rows], "source": "internal"}
 
 
 # ── Google OAuth ──────────────────────────────────────

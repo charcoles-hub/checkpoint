@@ -291,9 +291,12 @@ const STRINGS = {
     'contact.twitch_btn': 'Visitar canal de Twitch',
     'contact.footer_link': 'Contacto',
     'tour.replay': 'Iniciar tour',
-    'modal.price_history': 'Historial de precios',
-    'modal.price_history_empty': 'Aún no hay datos. Se irán acumulando con el tiempo.',
-    'modal.price_history_premium': 'Hazte Premium para ver el historial completo',
+    'ph.title': 'Historial de precios',
+    'ph.lock': 'Hazte Premium para ver el historial completo de precios',
+    'ph.empty': 'Sin datos históricos disponibles para este juego.',
+    'ph.range': 'Mínimo {min} · Máximo {max}',
+    'ph.promo_desc': 'Con Premium puedes consultar el historial completo de precios en Steam de cualquier juego. Descubre el precio mínimo histórico y el mejor momento para comprar.',
+    'ph.premium_hint': 'Haz clic en cualquier juego para ver su historial completo de precios en Steam.',
   },
 
   en: {
@@ -586,9 +589,12 @@ const STRINGS = {
     'contact.twitch_btn': 'Visit Twitch channel',
     'contact.footer_link': 'Contact',
     'tour.replay': 'Start tour',
-    'modal.price_history': 'Price history',
-    'modal.price_history_empty': 'No data yet. It will accumulate over time.',
-    'modal.price_history_premium': 'Go Premium to see full price history',
+    'ph.title': 'Price history',
+    'ph.lock': 'Go Premium to see the full price history',
+    'ph.empty': 'No historical data available for this game.',
+    'ph.range': 'Low {min} · High {max}',
+    'ph.promo_desc': 'With Premium you can check the full Steam price history for any game. Find the all-time low and the best time to buy.',
+    'ph.premium_hint': 'Click any game to see its full Steam price history.',
   }
 };
 

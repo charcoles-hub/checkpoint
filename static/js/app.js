@@ -570,7 +570,7 @@ async function openModal(gameId) {
         <button class="btn-ghost" id="btn-save-draft" style="padding:6px 14px;font-size:0.85rem">${t('modal.btn_draft')}</button>
       </div>` : ''}
       <div id="modal-reviews"></div>
-      ${myEntry?.status === 'wishlist' && AUTH.user ? '<div id="modal-price-history"></div>' : ''}
+      ${AUTH.user ? '<div id="modal-price-history"></div>' : ''}
     `;
 
     buildStars('stars-container', 0);
@@ -660,44 +660,52 @@ async function openModal(gameId) {
       showToast(t('toast.review_saved'));
     });
 
-    // Price history (wishlist games, logged in)
-    if (myEntry?.status === 'wishlist' && AUTH.user) {
+    // Price history
+    if (AUTH.user) {
       const phEl = document.getElementById('modal-price-history');
       if (phEl) {
-        phEl.innerHTML = `<div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--border)"><div class="loading" style="padding:20px 0"><div class="spinner"></div></div></div>`;
-        AUTH.apiFetch(`/api/games/${gameId}/price-history`)
-          .then(({ history, is_premium }) => {
-            if (!history.length) {
+        if (!AUTH.user.is_premium) {
+          phEl.innerHTML = `
+            <div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--border)">
+              <h4 class="modal-section-title">📈 ${t('ph.title')}</h4>
+              <div class="ph-lock" onclick="showPremiumModal()">⭐ ${t('ph.lock')}</div>
+            </div>`;
+        } else {
+          phEl.innerHTML = `<div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--border)"><div class="loading" style="padding:20px 0"><div class="spinner"></div></div></div>`;
+          AUTH.apiFetch(`/api/games/${gameId}/price-history`)
+            .then(({ history }) => {
+              if (!history.length) {
+                phEl.innerHTML = `
+                  <div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--border)">
+                    <h4 class="modal-section-title">📈 ${t('ph.title')}</h4>
+                    <p style="color:var(--muted);font-size:0.88rem">${t('ph.empty')}</p>
+                  </div>`;
+                return;
+              }
+              const prices = history.map(h => h.price ?? h.price_eur);
+              const dates = history.map(h => h.date ?? h.checked_at);
+              const max = Math.max(...prices);
+              const min = Math.min(...prices);
+              const fmt = p => `${Number(p).toFixed(2)}€`;
+              const bars = prices.map((p, i) => {
+                const pct = max > 0 ? Math.max(4, Math.round((p / max) * 100)) : 50;
+                const d = new Date(dates[i]).toLocaleDateString(t('time.locale'), { month: 'short', day: 'numeric', year: '2-digit' });
+                return `<div class="ph-col" title="${fmt(p)} — ${d}">
+                  <div class="ph-bar-wrap"><div class="ph-bar" style="height:${pct}%"></div></div>
+                  <div class="ph-label">${fmt(p)}</div>
+                  <div class="ph-date">${d}</div>
+                </div>`;
+              }).join('');
               phEl.innerHTML = `
                 <div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--border)">
-                  <h4 class="modal-section-title">📈 ${t('modal.price_history')}</h4>
-                  <p style="color:var(--muted);font-size:0.88rem">${t('modal.price_history_empty')}</p>
+                  <h4 class="modal-section-title">📈 ${t('ph.title')}
+                    <span style="color:var(--muted);font-weight:400;margin-left:8px">${t('ph.range', {min: fmt(min), max: fmt(max)})}</span>
+                  </h4>
+                  <div class="ph-chart">${bars}</div>
                 </div>`;
-              return;
-            }
-            const max = Math.max(...history.map(h => h.price_eur));
-            const min = Math.min(...history.map(h => h.price_eur));
-            const fmt = p => `${p.toFixed(2)}€`;
-            const bars = history.map(h => {
-              const pct = max > 0 ? Math.round((h.price_eur / max) * 100) : 50;
-              const d = new Date(h.checked_at).toLocaleDateString(t('time.locale'), { month: 'short', day: 'numeric' });
-              return `<div class="ph-col" title="${fmt(h.price_eur)} — ${d}">
-                <div class="ph-bar-wrap"><div class="ph-bar" style="height:${pct}%"></div></div>
-                <div class="ph-label">${fmt(h.price_eur)}</div>
-                <div class="ph-date">${d}</div>
-              </div>`;
-            }).join('');
-            const lock = !is_premium ? `<div class="ph-lock">⭐ ${t('modal.price_history_premium')}</div>` : '';
-            phEl.innerHTML = `
-              <div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--border)">
-                <h4 class="modal-section-title">📈 ${t('modal.price_history')}
-                  <span style="color:var(--muted);font-weight:400;margin-left:8px">${fmt(min)} – ${fmt(max)}</span>
-                </h4>
-                <div class="ph-chart">${bars}</div>
-                ${lock}
-              </div>`;
-          })
-          .catch(() => { phEl.innerHTML = ''; });
+            })
+            .catch(() => { phEl.innerHTML = ''; });
+        }
       }
     }
 
@@ -1033,6 +1041,7 @@ async function loadWishlist() {
       })));
     }
 
+    const phSection = document.getElementById('price-history-section');
     if (!AUTH.user.is_premium) {
       alertsEl.innerHTML = `
         <div style="padding:24px;background:linear-gradient(135deg,var(--surface2),var(--surface));border:1px solid var(--border);border-radius:14px;text-align:center;max-width:540px">
@@ -1041,8 +1050,17 @@ async function loadWishlist() {
           <p style="color:var(--muted);font-size:0.9rem;margin-bottom:18px;line-height:1.5">${t('alerts.promo_desc')}</p>
           <button class="btn-primary" onclick="showPremiumModal()" style="font-size:0.9rem">⭐ ${t('alerts.promo_btn')}</button>
         </div>`;
+      if (phSection) phSection.innerHTML = `
+        <div style="padding:24px;background:linear-gradient(135deg,rgba(34,211,238,0.05),var(--surface));border:1px solid rgba(34,211,238,0.2);border-radius:14px;max-width:540px">
+          <h3 style="font-size:1.1rem;margin-bottom:8px">📈 ${t('ph.title')}</h3>
+          <p style="color:var(--muted);font-size:0.9rem;margin-bottom:18px;line-height:1.5">${t('ph.promo_desc')}</p>
+          <button class="btn-primary" onclick="showPremiumModal()" style="font-size:0.9rem">⭐ ${t('alerts.promo_btn')}</button>
+        </div>`;
     } else {
       renderAlerts(alerts || []);
+      if (phSection) phSection.innerHTML = `
+        <h3 style="margin-bottom:12px;font-size:1.1rem">📈 ${t('ph.title')}</h3>
+        <p style="color:var(--muted);font-size:0.9rem">${t('ph.premium_hint')}</p>`;
     }
   } catch {
     wGrid.innerHTML = `<div class="no-results">${t('error.games')}</div>`;

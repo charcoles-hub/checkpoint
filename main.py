@@ -1382,6 +1382,60 @@ async def games_by_genre(genre_key: str, page: int = 1):
     ], "count": data["count"]}
 
 
+@app.get("/api/genres/{genre_key}/ranking")
+async def genre_community_ranking(genre_key: str):
+    genre_key = unquote(genre_key)
+    cache_key = f"genre_ranking:{genre_key}"
+    cached = cache_get(cache_key)
+    if cached is not None:
+        return cached
+
+    categories = await get_category_list()
+    genre_info = next((c for c in categories if c["key"] == genre_key), {})
+    rawg_type = genre_info.get("rawg_type", "genres")
+    rawg_slug = genre_info.get("rawg_slug", genre_key.lower())
+
+    # Fetch 3 pages in parallel (ordered by popularity) to get ~120 candidates
+    pages_data = await asyncio.gather(*[
+        get(f"{RAWG}/games", {
+            "key": RAWG_KEY, rawg_type: rawg_slug,
+            "page": p, "page_size": 40,
+            "ordering": "-added", "platforms": 4,
+        }) for p in range(1, 4)
+    ])
+
+    rawg_ids = []
+    for page_data in pages_data:
+        rawg_ids.extend([g["id"] for g in page_data.get("results", [])
+                         if not any(t["slug"] in _NSFW_TAGS for t in g.get("tags", []))])
+
+    # Resolve RAWG IDs to Steam appids (uses existing cache)
+    appids_raw = await asyncio.gather(*[resolve_steam_appid(rid) for rid in rawg_ids])
+    steam_appids = [a for a in appids_raw if a]
+
+    if not steam_appids:
+        cache_set(cache_key, [], ttl_hours=6)
+        return []
+
+    # Query community ratings for those appids
+    db = get_db()
+    placeholders = ",".join(["?"] * len(steam_appids))
+    rows = db.execute(
+        f"SELECT steam_appid, game_name, game_image, "
+        f"ROUND(AVG(rating),1) as avg_rating, COUNT(*) as votes "
+        f"FROM game_entries "
+        f"WHERE rating IS NOT NULL AND status='played' AND steam_appid IN ({placeholders}) "
+        f"GROUP BY steam_appid, game_name, game_image "
+        f"ORDER BY avg_rating DESC, votes DESC",
+        steam_appids
+    ).fetchall()
+    db.close()
+
+    result = [dict(r) for r in rows]
+    cache_set(cache_key, result, ttl_hours=6)
+    return result
+
+
 @app.get("/u/{username}")
 @app.get("/ranking")
 @app.get("/mi-perfil")

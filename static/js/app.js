@@ -460,7 +460,7 @@ async function loadGenreDetail(genreKey) {
       document.getElementById('explore-pagination').innerHTML = '';
       genreGrid.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
       try {
-        const ranking = await AUTH.apiFetch('/api/ranking');
+        const ranking = await AUTH.apiFetch(`/api/genres/${encodeURIComponent(genreKey)}/ranking`);
         if (!genreGrid) return;
         if (!ranking.length) {
           genreGrid.innerHTML = `<div class="no-results">${t('explore.no_community')}</div>`;

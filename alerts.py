@@ -1,6 +1,8 @@
+import asyncio
 import httpx
 import smtplib
 import os
+from datetime import datetime
 from email.mime.text import MIMEText
 from database import get_db
 
@@ -84,3 +86,38 @@ async def check_alerts():
 
     db.commit()
     db.close()
+
+
+async def check_wishlist_prices():
+    """Record daily price snapshot for every unique wishlist game."""
+    db = get_db()
+    rows = db.execute(
+        "SELECT DISTINCT steam_appid, game_name FROM game_entries WHERE status = 'wishlist'"
+    ).fetchall()
+    db.close()
+
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+    for row in [dict(r) for r in rows]:
+        appid = row["steam_appid"]
+        # Skip if already recorded today
+        db = get_db()
+        exists = db.execute(
+            "SELECT 1 FROM price_history WHERE steam_appid=? AND DATE(checked_at)=?",
+            (appid, today)
+        ).fetchone()
+        db.close()
+        if exists:
+            continue
+
+        price = await get_price(appid)
+        if price is None:
+            continue
+
+        db = get_db()
+        db.execute(
+            "INSERT INTO price_history (steam_appid, game_name, price_eur) VALUES (?, ?, ?)",
+            (appid, row["game_name"], price)
+        )
+        db.commit()
+        db.close()
+        await asyncio.sleep(0.5)  # evitar rate-limit de Steam

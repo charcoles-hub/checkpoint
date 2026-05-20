@@ -15,7 +15,7 @@ import httpx
 from dotenv import load_dotenv
 from database import get_db, init_db
 from auth import hash_pw, verify_pw, make_token, current_user, require_auth
-from alerts import check_alerts
+from alerts import check_alerts, check_wishlist_prices
 
 load_dotenv()
 
@@ -64,6 +64,7 @@ if STRIPE_SECRET_KEY:
 async def lifespan(app: FastAPI):
     init_db()
     asyncio.create_task(alert_loop())
+    asyncio.create_task(wishlist_price_loop())
     yield
 
 
@@ -98,8 +99,6 @@ app.add_middleware(SecurityHeadersMiddleware)
 STEAM = "https://store.steampowered.com/api"
 STEAMSPY = "https://steamspy.com/api.php"
 CDN = "https://cdn.akamai.steamstatic.com/steam/apps"
-ITAD_KEY = os.getenv("ITAD_API_KEY", "")
-ITAD_BASE = "https://api.isthereanydeal.com"
 
 
 def img(appid): return f"{CDN}/{appid}/header.jpg"
@@ -739,50 +738,10 @@ def delete_alert(appid: int, user=Depends(require_auth)):
     return {"ok": True}
 
 
-async def _itad_history(appid: int) -> list:
-    """Fetch full price history from IsThereAnyDeal API."""
-    if not ITAD_KEY:
-        return []
-    try:
-        async with httpx.AsyncClient(timeout=12) as c:
-            r = await c.get(f"{ITAD_BASE}/games/lookup/v1", params={"key": ITAD_KEY, "appid": appid})
-            if not r.is_success:
-                return []
-            game_id = r.json().get("game", {}).get("id")
-            if not game_id:
-                return []
-            r = await c.get(f"{ITAD_BASE}/games/pricehistory/v1", params={
-                "key": ITAD_KEY, "id": game_id, "country": "ES", "shops": "steam"
-            })
-            if not r.is_success:
-                return []
-        history = []
-        for shop in r.json():
-            if isinstance(shop, dict) and shop.get("shop", {}).get("id") == "steam":
-                for deal in shop.get("deals", []):
-                    price = deal.get("price", {}).get("amount")
-                    ts = deal.get("timestamp")
-                    if price is not None and ts is not None:
-                        history.append({
-                            "price": price,
-                            "date": datetime.utcfromtimestamp(ts).strftime("%Y-%m-%dT%H:%M:%SZ")
-                        })
-                break
-        return sorted(history, key=lambda x: x["date"])
-    except Exception:
-        return []
-
-
 @app.get("/api/games/{appid}/price-history")
-async def price_history(appid: int, user=Depends(require_auth)):
+def price_history(appid: int, user=Depends(require_auth)):
     if not user.get("is_premium"):
         raise HTTPException(403, "Feature exclusiva de Premium")
-
-    history = await _itad_history(appid)
-    if history:
-        return {"history": history, "source": "itad"}
-
-    # Fallback: datos propios del alert checker
     db = get_db()
     rows = db.execute(
         "SELECT price_eur AS price, checked_at AS date FROM price_history "
@@ -1045,6 +1004,17 @@ async def alert_loop():
         except Exception as e:
             print(f"[alerts] error: {e}")
         await asyncio.sleep(6 * 3600)
+
+
+async def wishlist_price_loop():
+    await asyncio.sleep(3600 * 6)  # primera ejecución 6h tras arranque
+    while True:
+        print("[prices] recording wishlist prices...")
+        try:
+            await check_wishlist_prices()
+        except Exception as e:
+            print(f"[prices] error: {e}")
+        await asyncio.sleep(3600 * 24)
 
 
 

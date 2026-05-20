@@ -458,6 +458,7 @@ async function loadGenreDetail(genreKey) {
     if (!genreGrid) return;
     let sorted = [...results];
     if (genreSort === 'community') {
+      document.getElementById('explore-pagination').innerHTML = '';
       sorted = sorted.filter(g => g.avg_rating).sort((a, b) => b.avg_rating - a.avg_rating);
       if (!sorted.length) {
         genreGrid.innerHTML = `<div class="no-results">${t('explore.no_community')}</div>`;

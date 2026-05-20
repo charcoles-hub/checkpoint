@@ -11,6 +11,8 @@ const STRINGS = {
 
     'profile_me.tab_account': 'Mi cuenta',
     'profile_me.section_edit': 'Editar perfil',
+    'profile_me.section_preview': 'Así te ven otros',
+    'profile_me.preview_btn': 'Ver perfil público',
     'profile_me.label_username': 'Nombre de usuario',
     'profile_me.label_bio': 'Bio',
     'profile_me.bio_hint': 'máx. 160 caracteres',
@@ -329,6 +331,8 @@ const STRINGS = {
 
     'profile_me.tab_account': 'My account',
     'profile_me.section_edit': 'Edit profile',
+    'profile_me.section_preview': 'How others see you',
+    'profile_me.preview_btn': 'View public profile',
     'profile_me.label_username': 'Username',
     'profile_me.label_bio': 'Bio',
     'profile_me.bio_hint': 'max. 160 chars',

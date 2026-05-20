@@ -756,6 +756,15 @@ function loadProfileMe() {
   document.getElementById('profile-me-name').textContent = AUTH.user.username;
   document.getElementById('profile-me-bio-display').textContent = AUTH.user.bio || '';
 
+  const previewBtn = document.getElementById('btn-preview-profile');
+  const freshPreview = previewBtn.cloneNode(true);
+  previewBtn.parentNode.replaceChild(freshPreview, previewBtn);
+  freshPreview.addEventListener('click', () => {
+    history.pushState({}, '', `/u/${AUTH.user.username}`);
+    showView('profile');
+    loadProfile(AUTH.user.username);
+  });
+
   document.querySelectorAll('#profile-me-tabs .list-tab').forEach(tab => {
     const fresh = tab.cloneNode(true);
     tab.parentNode.replaceChild(fresh, tab);
@@ -783,7 +792,7 @@ function switchProfileTab(tab) {
   else if (tab === 'account') loadMyAccount();
 }
 
-function loadMyAccount() {
+async function loadMyAccount() {
   const el = document.getElementById('account-content');
   const profileUrl = `${location.origin}/u/${AUTH.user.username}`;
 
@@ -820,6 +829,19 @@ function loadMyAccount() {
       <div style="display:flex;align-items:center;gap:14px;margin-bottom:32px">
         <button class="btn-primary" id="btn-save-account">${t('profile_me.btn_save')}</button>
         <span id="account-msg" style="display:none;font-size:0.9rem"></span>
+      </div>
+
+      <div style="margin-bottom:32px">
+        <p style="font-size:0.78rem;color:var(--muted2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:14px">${t('profile_me.section_preview')}</p>
+        <div id="community-preview-card" style="padding:14px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;gap:14px">
+          <div class="user-avatar-sm">${AUTH.user.username[0].toUpperCase()}</div>
+          <div style="flex:1">
+            <span class="user-row-name">${escHtml(AUTH.user.username)}</span>
+            ${AUTH.user.is_premium ? '<span class="premium-badge" style="font-size:0.8rem">⭐</span>' : ''}
+            <span id="preview-games-count" style="color:var(--muted);font-size:0.8rem;margin-left:8px"></span>
+          </div>
+          <button class="btn-ghost" id="btn-preview-from-account" style="font-size:0.82rem;padding:6px 12px">👁 ${t('profile_me.preview_btn')}</button>
+        </div>
       </div>
 
       <div style="padding:16px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
@@ -864,6 +886,17 @@ function loadMyAccount() {
   document.getElementById('btn-copy-profile-acc').addEventListener('click', () => {
     navigator.clipboard.writeText(profileUrl); showToast(t('toast.link_copied'));
   });
+
+  document.getElementById('btn-preview-from-account').addEventListener('click', () => {
+    history.pushState({}, '', `/u/${AUTH.user.username}`);
+    showView('profile');
+    loadProfile(AUTH.user.username);
+  });
+
+  AUTH.apiFetch(`/api/users/${AUTH.user.username}`).then(({ stats }) => {
+    const el = document.getElementById('preview-games-count');
+    if (el) el.textContent = t('following.games', { n: stats.total });
+  }).catch(() => {});
 }
 
 // ── Stats ────────────────────────────────────────────

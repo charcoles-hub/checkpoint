@@ -453,20 +453,26 @@ async function loadGenreDetail(genreKey) {
   genrePage = 1; genreSort = 'popular';
   document.querySelectorAll('#genre-sort-tabs .sort-tab').forEach(t => t.classList.toggle('active', t.dataset.sort === 'popular'));
 
-  const renderGenreGames = (results) => {
+  const renderGenreGames = async (results) => {
     const genreGrid = document.getElementById('genre-grid');
     if (!genreGrid) return;
-    let sorted = [...results];
     if (genreSort === 'community') {
       document.getElementById('explore-pagination').innerHTML = '';
-      sorted = sorted.filter(g => g.avg_rating).sort((a, b) => b.avg_rating - a.avg_rating);
-      if (!sorted.length) {
-        genreGrid.innerHTML = `<div class="no-results">${t('explore.no_community')}</div>`;
-        return;
-      }
+      genreGrid.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+      try {
+        const ranking = await AUTH.apiFetch('/api/ranking');
+        if (!genreGrid) return;
+        if (!ranking.length) {
+          genreGrid.innerHTML = `<div class="no-results">${t('explore.no_community')}</div>`;
+          return;
+        }
+        genreGrid.innerHTML = '';
+        ranking.forEach(g => genreGrid.appendChild(renderCard({ ...g, id: g.steam_appid }, () => openModal(g.steam_appid))));
+      } catch { genreGrid.innerHTML = `<div class="no-results">${t('explore.no_community')}</div>`; }
+      return;
     }
     genreGrid.innerHTML = '';
-    sorted.forEach(g => genreGrid.appendChild(renderCard(g, () => openModal(g.id))));
+    results.forEach(g => genreGrid.appendChild(renderCard(g, () => openModal(g.id))));
   };
 
   const fetchPage = async (page) => {

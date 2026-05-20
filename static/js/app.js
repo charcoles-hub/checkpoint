@@ -1800,59 +1800,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ── Onboarding Tour ───────────────────────────────────
 const TOUR_STEPS = [
-  {
-    target: null,
-    title: '👾 Bienvenido a Checkpoint',
-    text: 'Tu diario de gaming personal. Registra lo que juegas, descubre juegos nuevos y conecta con otros jugadores.',
-  },
-  {
-    target: '#games-grid',
-    title: '🎮 Juegos populares',
-    text: 'Los juegos más jugados del momento. Haz clic en cualquiera para ver detalles, precio actual y añadirlo a tu lista.',
-    pos: 'top',
-  },
-  {
-    target: '#genre-pills',
-    title: '🏷️ Filtra por género',
-    text: 'Acción, RPG, Indie, Estrategia... Elige el género que más te guste o usa el buscador para encontrar cualquier juego.',
-    pos: 'bottom',
-  },
-  {
-    target: '#nav-explore',
-    title: '🗺️ Explorar géneros',
-    text: 'En Explorar verás los mejores juegos de cada categoría con valoraciones reales de la comunidad.',
-    pos: 'bottom',
-  },
-  {
-    target: '#nav-ranking',
-    title: '🏆 Ranking de la comunidad',
-    text: '¿Cuáles son los juegos mejor valorados por los usuarios de Checkpoint? Descúbrelo aquí.',
-    pos: 'bottom',
-  },
-  {
-    target: '#nav-community',
-    title: '👥 Comunidad y feed',
-    text: 'Sigue a otros jugadores y ve en tiempo real qué están jugando, qué han terminado y qué opinan.',
-    pos: 'bottom',
-  },
-  {
-    target: '#nav-ideas',
-    title: '💡 Ideas y roadmap',
-    text: 'Propón nuevas funcionalidades y vota las de otros. El desarrollo de Checkpoint lo decide la comunidad.',
-    pos: 'bottom',
-  },
-  {
-    target: null,
-    title: '⭐ Checkpoint Premium',
-    text: 'Por 3,99€/mes: alertas de precio ilimitadas, historial de precios de Steam y badge ⭐ en tu perfil.',
-  },
-  {
-    target: '#btn-register',
-    title: '✨ Únete gratis',
-    text: 'Crea tu cuenta para llevar tu diario de juegos, valorarlos, seguir a otros jugadores y recibir alertas de precio.',
-    pos: 'bottom',
-    cta: true,
-  },
+  { target: null,           get title() { return t('tour.step0.title'); }, get text() { return t('tour.step0.text'); } },
+  { target: '#games-grid',  get title() { return t('tour.step1.title'); }, get text() { return t('tour.step1.text'); }, pos: 'top' },
+  { target: '#genre-pills', get title() { return t('tour.step2.title'); }, get text() { return t('tour.step2.text'); }, pos: 'bottom' },
+  { target: '#nav-explore', get title() { return t('tour.step3.title'); }, get text() { return t('tour.step3.text'); }, pos: 'bottom' },
+  { target: '#nav-ranking', get title() { return t('tour.step4.title'); }, get text() { return t('tour.step4.text'); }, pos: 'bottom' },
+  { target: '#nav-community', get title() { return t('tour.step5.title'); }, get text() { return t('tour.step5.text'); }, pos: 'bottom' },
+  { target: '#nav-ideas',   get title() { return t('tour.step6.title'); }, get text() { return t('tour.step6.text'); }, pos: 'bottom' },
+  { target: null,           get title() { return t('tour.step7.title'); }, get text() { return t('tour.step7.text'); } },
+  { target: '#btn-register', get title() { return t('tour.step8.title'); }, get text() { return t('tour.step8.text'); }, pos: 'bottom', cta: true },
 ];
 
 let _tourStep = 0;

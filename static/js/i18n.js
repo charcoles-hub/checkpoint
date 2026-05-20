@@ -290,6 +290,7 @@ const STRINGS = {
     'contact.desc': '¿Tienes preguntas, ideas o simplemente quieres saludar? Encuéntrame en Twitch.',
     'contact.twitch_btn': 'Visitar canal de Twitch',
     'contact.footer_link': 'Contacto',
+    'tour.replay': 'Iniciar tour',
   },
 
   en: {
@@ -581,6 +582,7 @@ const STRINGS = {
     'contact.desc': 'Got questions, ideas, or just want to say hi? Find me on Twitch.',
     'contact.twitch_btn': 'Visit Twitch channel',
     'contact.footer_link': 'Contact',
+    'tour.replay': 'Start tour',
   }
 };
 

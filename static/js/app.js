@@ -51,6 +51,7 @@ document.getElementById('nav-explore').addEventListener('click', () => { history
 document.getElementById('nav-community').addEventListener('click', () => { history.pushState({}, '', '/community'); showView('community'); loadCommunity(); closeMenu(); });
 document.getElementById('nav-ideas').addEventListener('click', () => { history.pushState({}, '', '/ideas'); showView('ideas'); loadIdeas(); closeMenu(); });
 document.getElementById('footer-contact').addEventListener('click', () => { history.pushState({}, '', '/contacto'); showView('contacto'); });
+document.getElementById('footer-tour').addEventListener('click', () => { localStorage.removeItem('ck_tour_done'); startTour(); });
 
 function resetHome() {
   currentPage = 1; currentSearch = ''; currentGenre = ''; currentPlatform = ''; currentSort = 'popular';
@@ -1749,6 +1750,11 @@ const TOUR_STEPS = [
     pos: 'bottom',
   },
   {
+    target: null,
+    title: '⭐ Checkpoint Premium',
+    text: 'Con Premium desbloqueas alertas de precio ilimitadas, sincronización automática con Steam, exportar tu colección, historial de precios y más. Por solo 3,99€/mes.',
+  },
+  {
     target: '#btn-register',
     title: '✨ Únete gratis',
     text: 'Crea tu cuenta para llevar tu diario de juegos, valorarlos, seguir a otros jugadores y recibir alertas de precio.',
@@ -1761,6 +1767,7 @@ let _tourStep = 0;
 let _tourEl = null;
 
 function startTour() {
+  if (_tourEl) return; // ya activo
   _tourStep = 0;
   _tourEl = document.createElement('div');
   _tourEl.id = 'tour-root';

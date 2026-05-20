@@ -675,7 +675,7 @@ def global_activity():
 
 
 # ── Admin cache clear ────────────────────────────────
-@app.delete("/api/admin/cache")
+@app.get("/api/admin/clear-cache")
 def clear_cache():
     db = get_db()
     db.execute("DELETE FROM api_cache WHERE key LIKE 'genre_%' OR key LIKE 'rawg_categories%'")

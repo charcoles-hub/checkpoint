@@ -82,6 +82,8 @@ document.getElementById('footer-contact').addEventListener('click', () => { hist
 document.getElementById('footer-tour').addEventListener('click', () => {
   localStorage.removeItem('ck_tour_done');
   if (_tourEl) { _tourEl.remove(); _tourEl = null; document.removeEventListener('keydown', _tourKeyHandler); }
+  history.pushState({}, '', '/');
+  resetHome();
   startTour();
 });
 
@@ -234,7 +236,7 @@ function renderCard(game, onClick, onDelete) {
   const rat = game.rating != null
     ? `<span class="game-rating">${game.rating}</span>`
     : game.avg_rating
-    ? `<span class="game-rating community-rating">★ ${game.avg_rating}</span>`
+    ? `<span class="game-rating community-rating">${game.avg_rating}</span>`
     : '';
   const extra = game.price
     ? `<span class="game-year" style="color:var(--cyan)">${game.price}</span>`

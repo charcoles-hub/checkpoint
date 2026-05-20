@@ -739,15 +739,33 @@ def delete_alert(appid: int, user=Depends(require_auth)):
 
 
 @app.get("/api/games/{appid}/price-history")
-def price_history(appid: int, user=Depends(require_auth)):
+async def price_history(appid: int, user=Depends(require_auth)):
     if not user.get("is_premium"):
         raise HTTPException(403, "Feature exclusiva de Premium")
+    from alerts import get_price
     db = get_db()
     rows = db.execute(
         "SELECT price_eur AS price, checked_at AS date FROM price_history "
         "WHERE steam_appid=? ORDER BY checked_at ASC",
         (appid,)
     ).fetchall()
+    if not rows:
+        price = await get_price(appid)
+        if price is not None:
+            game = db.execute(
+                "SELECT game_name FROM game_entries WHERE steam_appid=? LIMIT 1", (appid,)
+            ).fetchone()
+            game_name = game["game_name"] if game else str(appid)
+            db.execute(
+                "INSERT INTO price_history (steam_appid, game_name, price_eur) VALUES (?,?,?)",
+                (appid, game_name, price)
+            )
+            db.commit()
+            rows = db.execute(
+                "SELECT price_eur AS price, checked_at AS date FROM price_history "
+                "WHERE steam_appid=? ORDER BY checked_at ASC",
+                (appid,)
+            ).fetchall()
     db.close()
     return {"history": [dict(r) for r in rows], "source": "internal"}
 
@@ -1007,7 +1025,7 @@ async def alert_loop():
 
 
 async def wishlist_price_loop():
-    await asyncio.sleep(3600 * 6)  # primera ejecución 6h tras arranque
+    await asyncio.sleep(60)  # primera ejecución 60s tras arranque
     while True:
         print("[prices] recording wishlist prices...")
         try:

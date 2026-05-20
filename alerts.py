@@ -89,10 +89,10 @@ async def check_alerts():
 
 
 async def check_wishlist_prices():
-    """Record daily price snapshot for every unique wishlist game."""
+    """Record daily price snapshot for every unique game in any user's list."""
     db = get_db()
     rows = db.execute(
-        "SELECT DISTINCT steam_appid, game_name FROM game_entries WHERE status = 'wishlist'"
+        "SELECT DISTINCT steam_appid, game_name FROM game_entries WHERE status != 'library'"
     ).fetchall()
     db.close()
 

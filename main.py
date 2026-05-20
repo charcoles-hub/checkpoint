@@ -1134,16 +1134,43 @@ GENRES = [
     {"name": "Multijugador",      "key": "Massively Multiplayer","emoji": "🌐"},
     {"name": "Gratis",            "key": "Free to Play",         "emoji": "🎁"},
     {"name": "Acceso Anticipado", "key": "Early Access",         "emoji": "🚧"},
-    {"name": "Puzzle",            "key": "Puzzle",               "emoji": "🧩",  "type": "tag"},
-    {"name": "Terror",            "key": "Horror",               "emoji": "👻",  "type": "tag"},
-    {"name": "Mundo Abierto",     "key": "Open World",           "emoji": "🌍",  "type": "tag"},
-    {"name": "Roguelike",         "key": "Roguelike",            "emoji": "🎲",  "type": "tag"},
-    {"name": "Plataformas",       "key": "Platformer",           "emoji": "🦘",  "type": "tag"},
-    {"name": "Shooters",          "key": "Shooter",              "emoji": "🔫",  "type": "tag"},
-    {"name": "Supervivencia",     "key": "Survival",             "emoji": "🌿",  "type": "tag"},
+    # SteamSpy tags que funcionan (spy_tag sobreescribe el key en la petición a SteamSpy)
+    {"name": "Puzzle",     "key": "Puzzle",     "emoji": "🧩", "type": "tag"},
+    {"name": "Roguelike",  "key": "Roguelike",  "emoji": "🎲", "type": "tag", "spy_tag": "Rogue-like"},
+    {"name": "Plataformas","key": "Platformer", "emoji": "🦘", "type": "tag"},
+    {"name": "Shooters",   "key": "Shooter",    "emoji": "🔫", "type": "tag"},
+    # Steam Store Search para tags que SteamSpy devuelve mal (Apex Legends / PUBG en todo)
+    {"name": "Terror",        "key": "Horror",    "emoji": "👻", "source": "steam", "steam_tag_id": 1667},
+    {"name": "Supervivencia", "key": "Survival",  "emoji": "🌿", "source": "steam", "steam_tag_id": 1702},
+    {"name": "Mundo Abierto", "key": "Open World","emoji": "🌍", "source": "steam", "steam_tag_id": 1684},
 ]
 
 _GENRE_MAP = {g["key"]: g for g in GENRES}
+
+# ── Steam Store tag cache ─────────────────────────────
+_steam_tag_cache: dict[int, tuple[float, list]] = {}
+
+async def _fetch_steam_tag(tag_id: int) -> list:
+    """Top 100 juegos de Steam por tag ID. Cacheado 1h."""
+    now = time.time()
+    if tag_id in _steam_tag_cache:
+        ts, cached = _steam_tag_cache[tag_id]
+        if now - ts < 3600:
+            return cached
+    try:
+        data = await get(
+            "https://store.steampowered.com/search/results/",
+            {"tags": tag_id, "json": 1, "cc": "US", "l": "en", "count": 100}
+        )
+        games = []
+        for item in data.get("items", []):
+            m = re.search(r"/apps/(\d+)/", item.get("logo", ""))
+            if m:
+                games.append({"appid": int(m.group(1)), "name": item["name"]})
+        _steam_tag_cache[tag_id] = (now, games)
+        return games
+    except Exception:
+        return []
 
 
 @app.get("/api/genres")
@@ -1165,10 +1192,15 @@ async def genres_previews():
         except: return 0
 
     async def fetch_one(genre):
+        if genre.get("source") == "steam":
+            games = await _fetch_steam_tag(genre["steam_tag_id"])
+            first = games[0] if games else None
+            return {"key": genre["key"], "count": len(games),
+                    "cover_appid": first["appid"] if first else None}
         gtype = genre.get("type", "genre")
-        params = {"request": gtype, gtype: genre["key"]}
+        spy_key = genre.get("spy_tag", genre["key"])
         try:
-            data = await get(STEAMSPY, params)
+            data = await get(STEAMSPY, {"request": gtype, gtype: spy_key})
             games = sorted(data.values(), key=lambda g: parse_owners(g.get("owners", "0")), reverse=True)
             first = games[0] if games else None
             return {"key": genre["key"], "count": len(games),
@@ -1185,9 +1217,34 @@ async def genres_previews():
 @app.get("/api/genres/{genre_key}")
 async def games_by_genre(genre_key: str, page: int = 1):
     genre_key = unquote(genre_key)
-    gtype = _GENRE_MAP.get(genre_key, {}).get("type", "genre")
+    genre_info = _GENRE_MAP.get(genre_key, {})
+    ps = 24
+
+    if genre_info.get("source") == "steam":
+        all_g = await _fetch_steam_tag(genre_info["steam_tag_id"])
+        chunk = all_g[(page - 1) * ps: page * ps]
+        appids = [g["appid"] for g in chunk]
+        db = get_db()
+        community = {}
+        for appid in appids:
+            row = db.execute(
+                "SELECT ROUND(AVG(rating),1) as avg_rating, COUNT(*) as votes "
+                "FROM game_entries WHERE steam_appid=? AND rating IS NOT NULL AND status='played'",
+                (appid,)
+            ).fetchone()
+            if row and row["votes"]:
+                community[appid] = {"avg_rating": row["avg_rating"], "votes": row["votes"]}
+        db.close()
+        return {"results": [
+            {"id": g["appid"], "name": g["name"], "image": img(g["appid"]),
+             "playtime": 0, "price": None, **community.get(g["appid"], {})}
+            for g in chunk
+        ], "count": len(all_g)}
+
+    gtype = genre_info.get("type", "genre")
+    spy_key = genre_info.get("spy_tag", genre_key)
     try:
-        data = await get(STEAMSPY, {"request": gtype, gtype: genre_key})
+        data = await get(STEAMSPY, {"request": gtype, gtype: spy_key})
     except Exception:
         return {"results": [], "count": 0}
 
@@ -1196,7 +1253,6 @@ async def games_by_genre(genre_key: str, page: int = 1):
         except: return 0
 
     all_g = sorted(data.values(), key=lambda g: parse_owners(g.get("owners", "0")), reverse=True)
-    ps = 24
     chunk = all_g[(page - 1) * ps: page * ps]
     appids = [g["appid"] for g in chunk]
 

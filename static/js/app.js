@@ -847,12 +847,11 @@ function loadProfileMe() {
 
 function switchProfileTab(tab) {
   profileMeTab = tab;
-  ['mygames', 'wishlist', 'stats', 'steam', 'account'].forEach(p => {
+  ['mygames', 'wishlist', 'steam', 'account'].forEach(p => {
     document.getElementById(`panel-${p}`).style.display = p === tab ? '' : 'none';
   });
   if (tab === 'mygames') loadMyList();
   else if (tab === 'wishlist') loadWishlist();
-  else if (tab === 'stats') loadStats();
   else if (tab === 'steam') loadSteamTab();
   else if (tab === 'account') loadMyAccount();
 }
@@ -1079,102 +1078,6 @@ async function loadMyAccount() {
       ${stats.total_playtime > 0 ? `<div class="stat-box"><div class="stat-num">${Math.round(stats.total_playtime/60)}h</div><div class="stat-label">${t('profile.stat.steam')}</div></div>` : ''}
     `;
   }).catch(() => {});
-}
-
-// ── Stats ────────────────────────────────────────────
-async function loadStats() {
-  const el = document.getElementById('stats-content');
-  el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
-  try {
-    const s = await AUTH.apiFetch('/api/stats/me');
-    const counts = s.status_counts || {};
-    const total = s.total || 0;
-    const pct = n => total ? Math.round((n || 0) / total * 100) : 0;
-
-    const statusDefs = [
-      { key: 'played',    label: t('status.played'),    cls: 'played' },
-      { key: 'playing',   label: t('status.playing'),   cls: 'playing' },
-      { key: 'wishlist',  label: t('status.wishlist'),  cls: 'wishlist' },
-      { key: 'abandoned', label: t('status.abandoned'), cls: 'abandoned' },
-    ];
-
-    const maxRating = s.rating_histogram.length ? Math.max(...s.rating_histogram.map(r => r.count)) : 1;
-    const maxMonth  = s.monthly.length ? Math.max(...s.monthly.map(m => m.count), 1) : 1;
-
-    const shortMonth = m => {
-      const [y, mo] = m.split('-');
-      return new Date(+y, +mo - 1).toLocaleDateString(t('time.locale'), { month: 'short' });
-    };
-
-    el.innerHTML = `
-      <div class="stats-summary">
-        <div class="stat-box"><div class="stat-num">${total}</div><div class="stat-label">${t('stats.total')}</div></div>
-        <div class="stat-box"><div class="stat-num">${counts.played || 0}</div><div class="stat-label">${t('status.played')}</div></div>
-        <div class="stat-box"><div class="stat-num">${counts.playing || 0}</div><div class="stat-label">${t('status.playing')}</div></div>
-        <div class="stat-box"><div class="stat-num">${counts.wishlist || 0}</div><div class="stat-label">${t('status.wishlist')}</div></div>
-        ${counts.abandoned ? `<div class="stat-box"><div class="stat-num">${counts.abandoned}</div><div class="stat-label">${t('status.abandoned')}</div></div>` : ''}
-        ${s.avg_rating ? `<div class="stat-box"><div class="stat-num">${s.avg_rating}</div><div class="stat-label">${t('stats.avg_rating')}</div></div>` : ''}
-      </div>
-
-      ${total > 0 ? `
-      <div class="stats-panel">
-        <h4 class="stats-section-title">${t('stats.by_status')}</h4>
-        ${statusDefs.map(({key, label, cls}) => counts[key] ? `
-          <div class="stat-bar-row">
-            <span class="stat-bar-label">${label}</span>
-            <div class="stat-bar-track">
-              <div class="stat-bar-fill stat-bar-${cls}" style="width:${pct(counts[key])}%"></div>
-            </div>
-            <span class="stat-bar-count">${counts[key]} <span class="stat-bar-pct">${pct(counts[key])}%</span></span>
-          </div>`
-        : '').join('')}
-      </div>` : ''}
-
-      ${s.rating_histogram.length ? `
-      <div class="stats-panel">
-        <h4 class="stats-section-title">${t('stats.ratings_dist')}</h4>
-        <div class="rating-hist">
-          ${[...s.rating_histogram].reverse().map(({rating, count}) => `
-            <div class="rating-hist-row">
-              <span class="rating-hist-label">${rating}</span>
-              <div class="rating-hist-track">
-                <div class="rating-hist-bar" style="width:${Math.round(count/maxRating*100)}%"></div>
-              </div>
-              <span class="rating-hist-count">${count}</span>
-            </div>`
-          ).join('')}
-        </div>
-      </div>` : ''}
-
-      <div class="stats-panel">
-        <h4 class="stats-section-title">${t('stats.monthly')}</h4>
-        <div class="monthly-chart">
-          ${s.monthly.map(({month, count}) => `
-            <div class="month-col" title="${shortMonth(month)}: ${count}">
-              <div class="month-bar-wrap">
-                <div class="month-bar" style="height:${count ? Math.max(8, Math.round(count/maxMonth*100)) : 0}%"></div>
-              </div>
-              <span class="month-label">${shortMonth(month)}</span>
-            </div>`
-          ).join('')}
-        </div>
-      </div>
-
-      ${s.top_played.length ? `
-      <div class="stats-panel">
-        <h4 class="stats-section-title">${t('stats.top_playtime')}</h4>
-        ${s.top_played.map(({game_name, playtime}) => `
-          <div class="stat-bar-row">
-            <span class="stat-bar-label" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(game_name)}</span>
-            <div class="stat-bar-track">
-              <div class="stat-bar-fill stat-bar-played" style="width:${Math.round(playtime/s.top_played[0].playtime*100)}%"></div>
-            </div>
-            <span class="stat-bar-count">${Math.round(playtime/60)}h</span>
-          </div>`
-        ).join('')}
-      </div>` : ''}
-    `;
-  } catch { el.innerHTML = `<div class="no-results">${t('modal.error')}</div>`; }
 }
 
 // ── My List ──────────────────────────────────────────

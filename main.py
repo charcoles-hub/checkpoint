@@ -1334,83 +1334,36 @@ from fastapi.responses import FileResponse
 from urllib.parse import unquote
 
 # Traducciones ES y emojis para slugs conocidos de RAWG
-_RAWG_NAME_ES = {
-    "action": "Acción", "adventure": "Aventura", "role-playing-games-rpg": "RPG",
-    "strategy": "Estrategia", "simulation": "Simulación", "sports": "Deportes",
-    "indie": "Indie", "casual": "Casual", "racing": "Carreras",
-    "massively-multiplayer": "Multijugador MMO", "puzzle": "Puzzle",
-    "shooter": "Shooters", "platformer": "Plataformas", "arcade": "Arcade",
-    "fighting": "Lucha", "family": "Familiar", "card": "Cartas",
-    "board-games": "Tablero", "educational": "Educación",
-    "horror": "Terror", "survival": "Supervivencia", "open-world": "Mundo Abierto",
-    "roguelike": "Roguelike", "roguelite": "Roguelite", "co-op": "Co-op",
-    "multiplayer": "Multijugador", "free-to-play": "Gratis",
-    "early-access": "Acceso Anticipado", "fantasy": "Fantasía",
-    "sci-fi": "Ciencia Ficción", "stealth": "Sigilo",
-}
-_RAWG_EMOJI = {
-    "action": "⚔️", "adventure": "🗺️", "role-playing-games-rpg": "🧙",
-    "strategy": "♟️", "simulation": "🎮", "sports": "⚽", "indie": "🎨",
-    "casual": "😌", "racing": "🏎️", "massively-multiplayer": "🌐",
-    "puzzle": "🧩", "shooter": "🔫", "platformer": "🦘", "arcade": "👾",
-    "fighting": "🥊", "family": "👨‍👩‍👧", "card": "🃏", "board-games": "🎲",
-    "educational": "📚", "horror": "👻", "survival": "🌿",
-    "open-world": "🌍", "roguelike": "🎲", "roguelite": "🎲",
-    "co-op": "🤝", "multiplayer": "👥", "free-to-play": "🎁",
-    "early-access": "🚧", "fantasy": "🧝", "sci-fi": "🚀", "stealth": "🕵️",
-}
-# Tags que no son útiles como categoría de exploración
-_TAG_EXCLUDE = {
-    "singleplayer", "atmospheric", "great-soundtrack", "story-rich", "2d", "3d",
-    "first-person", "third-person", "pixel-graphics", "female-protagonist",
-    "dark", "funny", "relaxing", "difficult", "gore", "violent", "nudity",
-    "sexual-content", "anime", "lore-rich", "colorful", "cute", "retro",
-    "short", "sandbox",
-}
+_CURATED_CATEGORIES = [
+    # Géneros oficiales RAWG
+    {"name": "Acción",            "key": "action",                 "emoji": "⚔️",  "rawg_type": "genres", "rawg_slug": "action"},
+    {"name": "RPG",               "key": "role-playing-games-rpg", "emoji": "🧙",  "rawg_type": "genres", "rawg_slug": "role-playing-games-rpg"},
+    {"name": "Aventura",          "key": "adventure",              "emoji": "🗺️",  "rawg_type": "genres", "rawg_slug": "adventure"},
+    {"name": "Estrategia",        "key": "strategy",               "emoji": "♟️",  "rawg_type": "genres", "rawg_slug": "strategy"},
+    {"name": "Shooter",           "key": "shooter",                "emoji": "🔫",  "rawg_type": "genres", "rawg_slug": "shooter"},
+    {"name": "Plataformas",       "key": "platformer",             "emoji": "🦘",  "rawg_type": "genres", "rawg_slug": "platformer"},
+    {"name": "Simulación",        "key": "simulation",             "emoji": "🛠️",  "rawg_type": "genres", "rawg_slug": "simulation"},
+    {"name": "Deportes",          "key": "sports",                 "emoji": "⚽",  "rawg_type": "genres", "rawg_slug": "sports"},
+    {"name": "Carreras",          "key": "racing",                 "emoji": "🏎️",  "rawg_type": "genres", "rawg_slug": "racing"},
+    {"name": "Lucha",             "key": "fighting",               "emoji": "🥊",  "rawg_type": "genres", "rawg_slug": "fighting"},
+    {"name": "Puzzle",            "key": "puzzle",                 "emoji": "🧩",  "rawg_type": "genres", "rawg_slug": "puzzle"},
+    {"name": "Indie",             "key": "indie",                  "emoji": "🎨",  "rawg_type": "genres", "rawg_slug": "indie"},
+    # Tags de discovery
+    {"name": "Mundo Abierto",     "key": "open-world",             "emoji": "🌍",  "rawg_type": "tags",   "rawg_slug": "open-world"},
+    {"name": "Terror",            "key": "horror",                 "emoji": "👻",  "rawg_type": "tags",   "rawg_slug": "horror"},
+    {"name": "Supervivencia",     "key": "survival",               "emoji": "🌿",  "rawg_type": "tags",   "rawg_slug": "survival"},
+    {"name": "Roguelike",         "key": "roguelike",              "emoji": "🎲",  "rawg_type": "tags",   "rawg_slug": "roguelike"},
+    {"name": "Co-op",             "key": "co-op",                  "emoji": "🤝",  "rawg_type": "tags",   "rawg_slug": "co-op"},
+    {"name": "Multijugador",      "key": "multiplayer",            "emoji": "👥",  "rawg_type": "tags",   "rawg_slug": "multiplayer"},
+    {"name": "Ciencia Ficción",   "key": "sci-fi",                 "emoji": "🚀",  "rawg_type": "tags",   "rawg_slug": "sci-fi"},
+    {"name": "Fantasía",          "key": "fantasy",                "emoji": "🧝",  "rawg_type": "tags",   "rawg_slug": "fantasy"},
+    {"name": "Sigilo",            "key": "stealth",                "emoji": "🕵️",  "rawg_type": "tags",   "rawg_slug": "stealth"},
+    {"name": "Metroidvania",      "key": "metroidvania",           "emoji": "🗡️",  "rawg_type": "tags",   "rawg_slug": "metroidvania"},
+    {"name": "Acceso Anticipado", "key": "early-access",           "emoji": "🚧",  "rawg_type": "tags",   "rawg_slug": "early-access"},
+]
 
 async def get_category_list() -> list:
-    """Géneros RAWG + top tags populares. Cacheado 24h en DB."""
-    cached = cache_get("rawg_categories")
-    if cached is not None:
-        return cached
-
-    genres_data, tags_data = await asyncio.gather(
-        get(f"{RAWG}/genres", {"key": RAWG_KEY}),
-        get(f"{RAWG}/tags", {"key": RAWG_KEY, "ordering": "-games_count", "page_size": 50}),
-    )
-
-    categories = []
-    genre_slugs = set()
-
-    for g in genres_data.get("results", []):
-        slug = g["slug"]
-        genre_slugs.add(slug)
-        categories.append({
-            "name": _RAWG_NAME_ES.get(slug, g["name"]),
-            "key": slug,
-            "emoji": _RAWG_EMOJI.get(slug, "🎮"),
-            "rawg_type": "genres",
-            "rawg_slug": slug,
-        })
-
-    tag_count = 0
-    for t in tags_data.get("results", []):
-        if tag_count >= 15:
-            break
-        slug = t["slug"]
-        if slug in _TAG_EXCLUDE or slug in genre_slugs:
-            continue
-        categories.append({
-            "name": _RAWG_NAME_ES.get(slug, t["name"]),
-            "key": slug,
-            "emoji": _RAWG_EMOJI.get(slug, "🏷️"),
-            "rawg_type": "tags",
-            "rawg_slug": slug,
-        })
-        tag_count += 1
-
-    cache_set("rawg_categories", categories, ttl_hours=24)
-    return categories
+    return _CURATED_CATEGORIES
 
 
 @app.get("/api/genres")

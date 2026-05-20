@@ -105,6 +105,7 @@ STEAMSPY = "https://steamspy.com/api.php"
 CDN = "https://cdn.akamai.steamstatic.com/steam/apps"
 RAWG = "https://api.rawg.io/api"
 RAWG_KEY = os.getenv("RAWG_API_KEY", "")
+_NSFW_TAGS = {"nsfw", "sexual-content", "nudity", "hentai", "adult", "eroge", "18+", "ecchi"}
 
 
 def img(appid): return f"{CDN}/{appid}/header.jpg"
@@ -193,6 +194,7 @@ async def rawg_games_page(rawg_type: str, rawg_slug: str, page: int, cache_key: 
         })
         results = data.get("results", [])
         total = data.get("count", 0)
+        results = [g for g in results if not any(t["slug"] in _NSFW_TAGS for t in g.get("tags", []))]
         appids = await asyncio.gather(*[resolve_steam_appid(g["id"]) for g in results])
         games = []
         for g, appid in zip(results, appids):
@@ -224,6 +226,7 @@ async def list_games(search: str = "", page: int = 1):
             "search_precise": True,
         })
         results = data.get("results", [])
+        results = [g for g in results if not any(t["slug"] in _NSFW_TAGS for t in g.get("tags", []))]
         appids = await asyncio.gather(*[resolve_steam_appid(g["id"]) for g in results])
         games = [
             {"id": appid, "name": g["name"], "image": img(appid)}

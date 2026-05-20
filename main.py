@@ -1,4 +1,5 @@
 import asyncio
+import json
 import os
 import re
 import secrets
@@ -90,7 +91,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
             "font-src https://fonts.gstatic.com; "
             "img-src 'self' https://cdn.akamai.steamstatic.com https://media.steampowered.com "
-            "https://steamcdn-a.akamaihd.net https://shared.steamstatic.com data: blob:; "
+            "https://steamcdn-a.akamaihd.net https://shared.steamstatic.com https://media.rawg.io data: blob:; "
             "connect-src 'self'; "
             "frame-ancestors 'none';"
         )
@@ -102,6 +103,8 @@ app.add_middleware(SecurityHeadersMiddleware)
 STEAM = "https://store.steampowered.com/api"
 STEAMSPY = "https://steamspy.com/api.php"
 CDN = "https://cdn.akamai.steamstatic.com/steam/apps"
+RAWG = "https://api.rawg.io/api"
+RAWG_KEY = os.getenv("RAWG_API_KEY", "")
 
 
 def img(appid): return f"{CDN}/{appid}/header.jpg"
@@ -136,18 +139,99 @@ async def get(url, params=None):
         return r.json()
 
 
+# ── DB cache (persiste reinicios) ────────────────────────
+def cache_get(key: str):
+    db = get_db()
+    row = db.execute(
+        "SELECT data FROM api_cache WHERE key=? AND expires_at > CURRENT_TIMESTAMP",
+        (key,)
+    ).fetchone()
+    db.close()
+    return json.loads(row["data"]) if row else None
+
+def cache_set(key: str, data, ttl_hours: float = 24):
+    db = get_db()
+    expires = (datetime.now(timezone.utc) + timedelta(hours=ttl_hours)).isoformat()
+    db.execute(
+        "INSERT INTO api_cache (key, data, expires_at) VALUES (?,?,?) "
+        "ON CONFLICT(key) DO UPDATE SET data=excluded.data, expires_at=excluded.expires_at",
+        (key, json.dumps(data), expires)
+    )
+    db.commit()
+    db.close()
+
+async def resolve_steam_appid(rawg_id: int) -> int | None:
+    """RAWG game ID → Steam appid. Cacheado permanentemente en DB."""
+    cache_key = f"rawg_steam:{rawg_id}"
+    cached = cache_get(cache_key)
+    if cached is not None:
+        return cached.get("appid")
+    try:
+        data = await get(f"{RAWG}/games/{rawg_id}/stores", {"key": RAWG_KEY})
+        for store in data.get("results", []):
+            if store.get("store_id") == 1:
+                m = re.search(r"/app/(\d+)", store.get("url", ""))
+                if m:
+                    appid = int(m.group(1))
+                    cache_set(cache_key, {"appid": appid}, ttl_hours=8760)
+                    return appid
+    except Exception:
+        pass
+    cache_set(cache_key, {"appid": None}, ttl_hours=24)
+    return None
+
+async def rawg_games_page(rawg_type: str, rawg_slug: str, page: int, cache_key: str):
+    """Página de juegos de RAWG filtrada a juegos con Steam appid. Cacheado 24h en DB."""
+    cached = cache_get(cache_key)
+    if cached is not None:
+        return cached
+    try:
+        data = await get(f"{RAWG}/games", {
+            "key": RAWG_KEY, rawg_type: rawg_slug,
+            "page": page, "page_size": 40,
+            "ordering": "-rating", "platforms": 4,
+        })
+        results = data.get("results", [])
+        total = data.get("count", 0)
+        appids = await asyncio.gather(*[resolve_steam_appid(g["id"]) for g in results])
+        games = []
+        for g, appid in zip(results, appids):
+            if not appid:
+                continue
+            games.append({
+                "id": appid, "name": g["name"],
+                "image": img(appid),
+                "playtime": 0, "price": None,
+            })
+        out = {"results": games, "count": total}
+        cache_set(cache_key, out, ttl_hours=24)
+        return out
+    except Exception:
+        return {"results": [], "count": 0}
+
+
 # ── Games ──────────────────────────────────────────────
 @app.get("/api/games")
 async def list_games(search: str = "", page: int = 1):
     if search:
-        data = await get(f"{STEAM}/storesearch/", {"term": search, "l": "english", "cc": "US"})
-        return {"results": [
-            {"id": g["id"], "name": g["name"],
-             "image": g.get("tiny_image") or img(g["id"]),
-             "platforms": platforms(g.get("platforms", {})),
-             "price": fmt_price(g.get("price"))}
-            for g in data.get("items", []) if g.get("type") == "app"
-        ], "count": data.get("total", 0)}
+        cache_key = f"search:{search.lower().strip()}"
+        cached = cache_get(cache_key)
+        if cached is not None:
+            return cached
+        data = await get(f"{RAWG}/games", {
+            "key": RAWG_KEY, "search": search,
+            "page_size": 20, "platforms": 4,
+            "search_precise": True,
+        })
+        results = data.get("results", [])
+        appids = await asyncio.gather(*[resolve_steam_appid(g["id"]) for g in results])
+        games = [
+            {"id": appid, "name": g["name"], "image": img(appid)}
+            for g, appid in zip(results, appids) if appid
+        ]
+        out = {"results": games, "count": len(games)}
+        cache_set(cache_key, out, ttl_hours=1)
+        return out
 
     data = await get(STEAMSPY, {"request": "top100in2weeks"})
     all_g = list(data.values())
@@ -1122,55 +1206,30 @@ from fastapi.responses import FileResponse
 from urllib.parse import unquote
 
 GENRES = [
-    {"name": "Acción",            "key": "Action",               "emoji": "⚔️"},
-    {"name": "Aventura",          "key": "Adventure",            "emoji": "🗺️"},
-    {"name": "RPG",               "key": "RPG",                  "emoji": "🧙"},
-    {"name": "Estrategia",        "key": "Strategy",             "emoji": "♟️"},
-    {"name": "Simulación",        "key": "Simulation",           "emoji": "🎮"},
-    {"name": "Deportes",          "key": "Sports",               "emoji": "⚽"},
-    {"name": "Indie",             "key": "Indie",                "emoji": "🎨"},
-    {"name": "Casual",            "key": "Casual",               "emoji": "😌"},
-    {"name": "Carreras",          "key": "Racing",               "emoji": "🏎️"},
-    {"name": "Multijugador",      "key": "Massively Multiplayer","emoji": "🌐"},
-    {"name": "Gratis",            "key": "Free to Play",         "emoji": "🎁"},
-    {"name": "Acceso Anticipado", "key": "Early Access",         "emoji": "🚧"},
-    # SteamSpy tags que funcionan (spy_tag sobreescribe el key en la petición a SteamSpy)
-    {"name": "Puzzle",     "key": "Puzzle",     "emoji": "🧩", "type": "tag"},
-    {"name": "Roguelike",  "key": "Roguelike",  "emoji": "🎲", "type": "tag", "spy_tag": "Rogue-like"},
-    {"name": "Plataformas","key": "Platformer", "emoji": "🦘", "type": "tag"},
-    {"name": "Shooters",   "key": "Shooter",    "emoji": "🔫", "type": "tag"},
-    # Steam Store Search para tags que SteamSpy devuelve mal (Apex Legends / PUBG en todo)
-    {"name": "Terror",        "key": "Horror",    "emoji": "👻", "source": "steam", "steam_tag_id": 1667},
-    {"name": "Supervivencia", "key": "Survival",  "emoji": "🌿", "source": "steam", "steam_tag_id": 1702},
-    {"name": "Mundo Abierto", "key": "Open World","emoji": "🌍", "source": "steam", "steam_tag_id": 1684},
+    # Géneros RAWG (rawg_type="genres")
+    {"name": "Acción",            "key": "Action",               "emoji": "⚔️",  "rawg_type": "genres", "rawg_slug": "action"},
+    {"name": "Aventura",          "key": "Adventure",            "emoji": "🗺️",  "rawg_type": "genres", "rawg_slug": "adventure"},
+    {"name": "RPG",               "key": "RPG",                  "emoji": "🧙",  "rawg_type": "genres", "rawg_slug": "role-playing-games-rpg"},
+    {"name": "Estrategia",        "key": "Strategy",             "emoji": "♟️",  "rawg_type": "genres", "rawg_slug": "strategy"},
+    {"name": "Simulación",        "key": "Simulation",           "emoji": "🎮",  "rawg_type": "genres", "rawg_slug": "simulation"},
+    {"name": "Deportes",          "key": "Sports",               "emoji": "⚽",  "rawg_type": "genres", "rawg_slug": "sports"},
+    {"name": "Indie",             "key": "Indie",                "emoji": "🎨",  "rawg_type": "genres", "rawg_slug": "indie"},
+    {"name": "Casual",            "key": "Casual",               "emoji": "😌",  "rawg_type": "genres", "rawg_slug": "casual"},
+    {"name": "Carreras",          "key": "Racing",               "emoji": "🏎️",  "rawg_type": "genres", "rawg_slug": "racing"},
+    {"name": "Multijugador",      "key": "Massively Multiplayer","emoji": "🌐",  "rawg_type": "genres", "rawg_slug": "massively-multiplayer"},
+    {"name": "Puzzle",            "key": "Puzzle",               "emoji": "🧩",  "rawg_type": "genres", "rawg_slug": "puzzle"},
+    # Tags RAWG (rawg_type="tags")
+    {"name": "Terror",            "key": "Horror",               "emoji": "👻",  "rawg_type": "tags", "rawg_slug": "horror"},
+    {"name": "Mundo Abierto",     "key": "Open World",           "emoji": "🌍",  "rawg_type": "tags", "rawg_slug": "open-world"},
+    {"name": "Roguelike",         "key": "Roguelike",            "emoji": "🎲",  "rawg_type": "tags", "rawg_slug": "roguelike"},
+    {"name": "Plataformas",       "key": "Platformer",           "emoji": "🦘",  "rawg_type": "tags", "rawg_slug": "platformer"},
+    {"name": "Shooters",          "key": "Shooter",              "emoji": "🔫",  "rawg_type": "tags", "rawg_slug": "shooter"},
+    {"name": "Supervivencia",     "key": "Survival",             "emoji": "🌿",  "rawg_type": "tags", "rawg_slug": "survival"},
+    {"name": "Gratis",            "key": "Free to Play",         "emoji": "🎁",  "rawg_type": "tags", "rawg_slug": "free-to-play"},
+    {"name": "Acceso Anticipado", "key": "Early Access",         "emoji": "🚧",  "rawg_type": "tags", "rawg_slug": "early-access"},
 ]
 
 _GENRE_MAP = {g["key"]: g for g in GENRES}
-
-# ── Steam Store tag cache ─────────────────────────────
-_steam_tag_cache: dict[int, tuple[float, list]] = {}
-
-async def _fetch_steam_tag(tag_id: int) -> list:
-    """Top 100 juegos de Steam por tag ID. Cacheado 1h."""
-    now = time.time()
-    if tag_id in _steam_tag_cache:
-        ts, cached = _steam_tag_cache[tag_id]
-        if now - ts < 3600:
-            return cached
-    try:
-        data = await get(
-            "https://store.steampowered.com/search/results/",
-            {"tags": tag_id, "json": 1, "cc": "US", "l": "en", "count": 100}
-        )
-        games = []
-        for item in data.get("items", []):
-            m = re.search(r"/apps/(\d+)/", item.get("logo", ""))
-            if m:
-                games.append({"appid": int(m.group(1)), "name": item["name"]})
-        _steam_tag_cache[tag_id] = (now, games)
-        return games
-    except Exception:
-        return []
 
 
 @app.get("/api/genres")
@@ -1178,84 +1237,47 @@ def list_genres():
     return GENRES
 
 
-_previews_cache: dict | None = None
-_previews_ts: float = 0.0
-
 @app.get("/api/genres/previews")
 async def genres_previews():
-    global _previews_cache, _previews_ts
-    if _previews_cache and (time.time() - _previews_ts) < 3600:
-        return _previews_cache
-
-    def parse_owners(s):
-        try: return int(s.split("..")[0].replace(",", "").replace(" ", "").strip())
-        except: return 0
-
     async def fetch_one(genre):
-        if genre.get("source") == "steam":
-            games = await _fetch_steam_tag(genre["steam_tag_id"])
-            first = games[0] if games else None
-            return {"key": genre["key"], "count": len(games),
-                    "cover_appid": first["appid"] if first else None}
-        gtype = genre.get("type", "genre")
-        spy_key = genre.get("spy_tag", genre["key"])
+        cache_key = f"genre_preview:{genre['key']}"
+        cached = cache_get(cache_key)
+        if cached is not None:
+            return cached
         try:
-            data = await get(STEAMSPY, {"request": gtype, gtype: spy_key})
-            games = sorted(data.values(), key=lambda g: parse_owners(g.get("owners", "0")), reverse=True)
-            first = games[0] if games else None
-            return {"key": genre["key"], "count": len(games),
-                    "cover_appid": first["appid"] if first else None}
+            data = await get(f"{RAWG}/games", {
+                "key": RAWG_KEY, genre["rawg_type"]: genre["rawg_slug"],
+                "page_size": 1, "ordering": "-rating", "platforms": 4,
+            })
+            results = data.get("results", [])
+            first = results[0] if results else None
+            out = {
+                "key": genre["key"],
+                "count": data.get("count", 0),
+                "cover_img": first.get("background_image") if first else None,
+            }
+            cache_set(cache_key, out, ttl_hours=24)
+            return out
         except Exception:
-            return {"key": genre["key"], "count": 0, "cover_appid": None}
+            return {"key": genre["key"], "count": 0, "cover_img": None}
 
     results = await asyncio.gather(*[fetch_one(g) for g in GENRES])
-    _previews_cache = {r["key"]: r for r in results}
-    _previews_ts = time.time()
-    return _previews_cache
+    return {r["key"]: r for r in results}
 
 
 @app.get("/api/genres/{genre_key}")
 async def games_by_genre(genre_key: str, page: int = 1):
     genre_key = unquote(genre_key)
     genre_info = _GENRE_MAP.get(genre_key, {})
-    ps = 24
+    cache_key = f"genre_detail:{genre_key}:{page}"
 
-    if genre_info.get("source") == "steam":
-        all_g = await _fetch_steam_tag(genre_info["steam_tag_id"])
-        chunk = all_g[(page - 1) * ps: page * ps]
-        appids = [g["appid"] for g in chunk]
-        db = get_db()
-        community = {}
-        for appid in appids:
-            row = db.execute(
-                "SELECT ROUND(AVG(rating),1) as avg_rating, COUNT(*) as votes "
-                "FROM game_entries WHERE steam_appid=? AND rating IS NOT NULL AND status='played'",
-                (appid,)
-            ).fetchone()
-            if row and row["votes"]:
-                community[appid] = {"avg_rating": row["avg_rating"], "votes": row["votes"]}
-        db.close()
-        return {"results": [
-            {"id": g["appid"], "name": g["name"], "image": img(g["appid"]),
-             "playtime": 0, "price": None, **community.get(g["appid"], {})}
-            for g in chunk
-        ], "count": len(all_g)}
+    data = await rawg_games_page(
+        genre_info.get("rawg_type", "genres"),
+        genre_info.get("rawg_slug", genre_key.lower()),
+        page, cache_key,
+    )
 
-    gtype = genre_info.get("type", "genre")
-    spy_key = genre_info.get("spy_tag", genre_key)
-    try:
-        data = await get(STEAMSPY, {"request": gtype, gtype: spy_key})
-    except Exception:
-        return {"results": [], "count": 0}
-
-    def parse_owners(s):
-        try: return int(s.split("..")[0].replace(",", "").replace(" ", "").strip())
-        except: return 0
-
-    all_g = sorted(data.values(), key=lambda g: parse_owners(g.get("owners", "0")), reverse=True)
-    chunk = all_g[(page - 1) * ps: page * ps]
-    appids = [g["appid"] for g in chunk]
-
+    appids = [g["id"] for g in data["results"]]
     db = get_db()
     community = {}
     for appid in appids:
@@ -1269,12 +1291,8 @@ async def games_by_genre(genre_key: str, page: int = 1):
     db.close()
 
     return {"results": [
-        {"id": g["appid"], "name": g["name"], "image": img(g["appid"]),
-         "playtime": round(g.get("average_forever", 0) / 60, 1),
-         "price": fmt_spy_price(g),
-         **community.get(g["appid"], {})}
-        for g in chunk
-    ], "count": len(all_g)}
+        {**g, **community.get(g["id"], {})} for g in data["results"]
+    ], "count": data["count"]}
 
 
 @app.get("/u/{username}")

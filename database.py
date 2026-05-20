@@ -157,6 +157,11 @@ def _init_sqlite():
             price_eur   REAL NOT NULL,
             checked_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
+        CREATE TABLE IF NOT EXISTS api_cache (
+            key        TEXT PRIMARY KEY,
+            data       TEXT NOT NULL,
+            expires_at TIMESTAMP NOT NULL
+        );
     """)
     db.commit()
     db.close()

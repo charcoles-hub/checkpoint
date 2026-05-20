@@ -378,9 +378,7 @@ async function loadExplore() {
 
     genres.forEach(genre => {
       const preview = previews[genre.key] || {};
-      const coverImg = preview.cover_appid
-        ? `https://cdn.akamai.steamstatic.com/steam/apps/${preview.cover_appid}/header.jpg`
-        : '';
+      const coverImg = preview.cover_img || '';
       const count = preview.count || 0;
 
       const card = document.createElement('div');

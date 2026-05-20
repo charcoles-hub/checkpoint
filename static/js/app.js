@@ -1965,7 +1965,7 @@ async function loadIdeas() {
   });
 
   try {
-    ideasData = await fetch('/api/suggestions').then(r => r.json());
+    ideasData = await AUTH.apiFetch('/api/suggestions');
     renderIdeas();
   } catch { el.innerHTML = `<div class="no-results">${t('modal.error')}</div>`; }
 
@@ -1992,7 +1992,7 @@ async function loadIdeas() {
       await AUTH.apiFetch('/api/suggestions', { method: 'POST', body: JSON.stringify({ title, body: body || null }) });
       ideaOverlay.classList.remove('open');
       showToast(t('ideas.toast_sent'));
-      ideasData = await fetch('/api/suggestions').then(r => r.json());
+      ideasData = await AUTH.apiFetch('/api/suggestions');
       renderIdeas();
     } catch(e) {
       msgEl.style.display = ''; msgEl.style.color = '#ef4444'; msgEl.textContent = e.message;

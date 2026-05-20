@@ -41,6 +41,7 @@ const STRINGS = {
     'nav.login': 'Iniciar sesión',
     'nav.register': 'Registrarse',
 
+    'hero.eyebrow': 'Tu diario de videojuegos',
     'hero.title': 'Marca tu <span class="gradient-text">checkpoint</span>',
     'hero.subtitle': 'Registra lo que has jugado, puntúa, escribe tus opiniones y compártelas con otros jugadores.',
     'hero.search': 'Buscar un juego...',
@@ -373,6 +374,7 @@ const STRINGS = {
     'nav.login': 'Log in',
     'nav.register': 'Sign up',
 
+    'hero.eyebrow': 'Your gaming diary',
     'hero.title': 'Mark your <span class="gradient-text">checkpoint</span>',
     'hero.subtitle': "Track what you've played, rate games, write your reviews and share them with other players.",
     'hero.search': 'Search for a game...',

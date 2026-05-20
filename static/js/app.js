@@ -56,13 +56,16 @@ function showView(name) {
 // ── Nav hamburger ────────────────────────────────────
 const hamburger = document.getElementById('hamburger');
 const navRight = document.getElementById('nav-right');
+const navLinks = document.querySelector('.nav-links');
 hamburger.addEventListener('click', () => {
   hamburger.classList.toggle('open');
   navRight.classList.toggle('open');
+  if (navLinks) navLinks.classList.toggle('open');
 });
 function closeMenu() {
   hamburger.classList.remove('open');
   navRight.classList.remove('open');
+  if (navLinks) navLinks.classList.remove('open');
 }
 document.addEventListener('click', e => {
   if (!e.target.closest('.nav-inner')) closeMenu();
@@ -215,29 +218,44 @@ document.querySelectorAll('#sort-tabs .sort-tab').forEach(tab => {
 
 // ── Game cards ───────────────────────────────────────
 function renderCard(game, onClick, onDelete) {
-  const platforms = (game.platforms || []).slice(0, 3);
   const statusLabel = { played: t('status.played'), playing: t('status.playing'), wishlist: t('status.wishlist'), abandoned: t('status.abandoned') };
   const name = game.name || game.game_name;
-  const image = game.image || game.game_image;
+  const appid = game.id || game.steam_appid;
+  const headerUrl = game.image || game.game_image || '';
+  const posterUrl = appid ? `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/library_600x900.jpg` : headerUrl;
 
   const card = document.createElement('div');
   card.className = 'game-card';
+
+  const badge = (game.status && game.status !== 'library')
+    ? `<span class="status-badge status-${game.status}">${statusLabel[game.status]}</span>`
+    : '';
+  const rat = game.rating != null
+    ? `<span class="game-rating">${game.rating}</span>`
+    : game.avg_rating
+    ? `<span class="game-rating community-rating">★ ${game.avg_rating}</span>`
+    : '';
+  const extra = game.price
+    ? `<span class="game-year" style="color:var(--cyan)">${game.price}</span>`
+    : game.playtime > 0
+    ? `<span class="game-year" style="color:var(--muted)">${Math.round(game.playtime/60)}h</span>`
+    : '';
+
+  const imgHtml = posterUrl
+    ? `<img class="game-card-img" src="${posterUrl}" alt="${escHtml(name)}" loading="lazy"
+        onerror="if(this.src!=='${headerUrl}'){this.src='${headerUrl}';this.onerror=null}" />`
+    : `<div class="game-card-img-placeholder">🎮</div>`;
+
   card.innerHTML = `
-    ${image ? `<img class="game-card-img" src="${image}" alt="${name}" loading="lazy" />` : `<div class="game-card-img-placeholder">🎮</div>`}
+    ${imgHtml}
+    <div class="game-card-overlay"></div>
+    ${badge}
     <div class="game-card-body">
-      <div class="game-card-title">${name}</div>
-      <div class="game-card-meta">
-        ${game.rating != null ? `<span class="game-rating">${game.rating}/10</span>` : ''}
-        ${game.avg_rating ? `<span class="game-rating community-rating" title="${game.votes} votos">★ ${game.avg_rating}</span>` : ''}
-        ${game.status && game.status !== 'library' ? `<span class="status-badge status-${game.status}">${statusLabel[game.status]}</span>` : ''}
-        ${game.price ? `<span class="game-year" style="color:var(--cyan)">${game.price}</span>` : ''}
-        ${game.playtime > 0 ? `<span class="game-year" style="color:var(--muted)">${Math.round(game.playtime/60)}h</span>` : ''}
-      </div>
-      ${platforms.length ? `<div class="game-platforms">${platforms.map(p => `<span class="platform-tag">${p}</span>`).join('')}</div>` : ''}
-      ${game.notes ? `<div class="game-notes">"${escHtml(game.notes.slice(0, 60))}${game.notes.length > 60 ? '…' : ''}"</div>` : ''}
-      ${game.review ? `<div class="game-notes game-review-snippet">✍️ ${escHtml(game.review.slice(0, 80))}${game.review.length > 80 ? '…' : ''}</div>` : ''}
+      <div class="game-card-title">${escHtml(name)}</div>
+      <div class="game-card-meta">${rat}${extra}</div>
     </div>
   `;
+
   if (onDelete) {
     const del = document.createElement('button');
     del.className = 'card-delete-btn';
@@ -246,7 +264,6 @@ function renderCard(game, onClick, onDelete) {
     del.addEventListener('click', e => { e.stopPropagation(); onDelete(); });
     card.appendChild(del);
   }
-  const appid = game.id || game.steam_appid;
   card.addEventListener('click', onClick || (() => openModal(appid)));
   return card;
 }

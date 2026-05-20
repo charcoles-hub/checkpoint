@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Checkpoint</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,400&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/css/style.css" />
   <link rel="manifest" href="/manifest.json" />
   <meta name="theme-color" content="#8b5cf6" />
@@ -20,12 +21,14 @@
       <span class="logo-icon">⊙</span>
       <span>Checkpoint</span>
     </a>
+    <div class="nav-links">
+      <button class="nl" id="nav-profile-me" style="display:none" data-i18n="nav.profile_me">Mi Perfil</button>
+      <button class="nl" id="nav-explore" data-i18n="nav.explore">Explorar</button>
+      <button class="nl" id="nav-ranking" data-i18n="nav.ranking">Ranking</button>
+      <button class="nl" id="nav-community" data-i18n="nav.community">Comunidad</button>
+      <button class="nl" id="nav-ideas" data-i18n="nav.ideas">💡 Ideas</button>
+    </div>
     <div class="nav-right" id="nav-right">
-      <button class="btn-ghost" id="nav-explore" data-i18n="nav.explore">Explorar</button>
-      <button class="btn-ghost" id="nav-ranking" data-i18n="nav.ranking">Ranking</button>
-      <button class="btn-ghost" id="nav-community" data-i18n="nav.community">Comunidad</button>
-      <button class="btn-ghost" id="nav-ideas" data-i18n="nav.ideas">💡 Ideas</button>
-      <button class="btn-ghost" id="nav-profile-me" style="display:none" data-i18n="nav.profile_me">Mi perfil</button>
       <div class="user-menu" id="user-menu" style="display:none">
         <button class="btn-user" id="btn-username"></button>
         <div class="user-dropdown" id="user-dropdown">
@@ -84,15 +87,21 @@
   <!-- HOME VIEW -->
   <div id="view-home">
     <section class="hero">
-      <div class="hero-bg"></div>
+      <div class="hero-bg">
+        <div class="au au1"></div>
+        <div class="au au2"></div>
+        <div class="au au3"></div>
+      </div>
       <div class="hero-content">
+        <div class="eyebrow"><span class="edot"></span><span data-i18n="hero.eyebrow">Tu diario de videojuegos</span></div>
         <h1 data-i18n-html="hero.title">Marca tu <span class="gradient-text">checkpoint</span></h1>
         <p data-i18n="hero.subtitle">Registra lo que has jugado, puntúa, escribe tus opiniones y compártelas con otros jugadores.</p>
         <div class="search-bar">
           <span class="search-icon">⌕</span>
           <input type="text" id="search-input" autocomplete="off" data-i18n-placeholder="hero.search" placeholder="Buscar un juego..." />
+          <span class="search-kbd">⌘K</span>
         </div>
-        <!-- Genre pills (browse mode) -->
+        <!-- Genre pills (hidden, used by JS for filtering) -->
         <div class="genre-pills" id="genre-pills">
           <button class="genre-pill active" data-genre="" data-i18n="genre.all">Todos</button>
         </div>

@@ -1177,12 +1177,18 @@ async function loadMyList() {
     renderList();
   });
 
+  let myListPage = 1;
+  const MY_PAGE = 21;
+
   function renderList() {
     listGrid.style.display = '';
     searchBox.style.display = '';
     let filtered = activeStatus === 'all' ? entries.filter(e => e.status !== 'wishlist') : entries.filter(e => e.status === activeStatus);
     if (listSearch) filtered = filtered.filter(e => (e.game_name || '').toLowerCase().includes(listSearch));
+
+    document.getElementById('mylist-pagination')?.remove();
     listGrid.innerHTML = '';
+
     if (!filtered.length) {
       const isEmpty = entries.length === 0;
       listGrid.innerHTML = isEmpty
@@ -1193,12 +1199,31 @@ async function loadMyList() {
       });
       return;
     }
-    filtered.forEach(e => listGrid.appendChild(renderCard(e, () => openModal(e.steam_appid), async () => {
+
+    const totalPages = Math.ceil(filtered.length / MY_PAGE);
+    if (myListPage > totalPages) myListPage = 1;
+    const pageItems = filtered.slice((myListPage - 1) * MY_PAGE, myListPage * MY_PAGE);
+
+    pageItems.forEach(e => listGrid.appendChild(renderCard(e, () => openModal(e.steam_appid), async () => {
       await AUTH.apiFetch(`/api/list/${e.steam_appid}`, { method: 'DELETE' });
       entries.splice(entries.indexOf(e), 1);
       renderList();
       showToast(t('toast.game_removed'));
     })));
+
+    if (totalPages > 1) {
+      const pag = document.createElement('div');
+      pag.id = 'mylist-pagination';
+      pag.className = 'pagination';
+      const prev = mkBtn(t('btn.prev'), myListPage === 1, () => { myListPage--; renderList(); listGrid.scrollIntoView({behavior:'smooth',block:'start'}); });
+      pag.appendChild(prev);
+      for (let p = 1; p <= totalPages; p++) {
+        pag.appendChild(mkBtn(p, false, () => { myListPage = p; renderList(); listGrid.scrollIntoView({behavior:'smooth',block:'start'}); }, p === myListPage));
+      }
+      const next = mkBtn(t('btn.next'), myListPage === totalPages, () => { myListPage++; renderList(); listGrid.scrollIntoView({behavior:'smooth',block:'start'}); });
+      pag.appendChild(next);
+      listGrid.after(pag);
+    }
   }
 
   document.querySelectorAll('#mylist-tabs .list-tab').forEach(tab => {
@@ -1206,7 +1231,7 @@ async function loadMyList() {
     tab.parentNode.replaceChild(fresh, tab);
     fresh.addEventListener('click', () => {
       document.querySelectorAll('#mylist-tabs .list-tab').forEach(t => t.classList.remove('active'));
-      fresh.classList.add('active'); activeStatus = fresh.dataset.status; renderList();
+      fresh.classList.add('active'); activeStatus = fresh.dataset.status; myListPage = 1; renderList();
     });
   });
 
@@ -1224,16 +1249,36 @@ async function loadWishlist() {
     const fetchAlerts = AUTH.user.is_premium ? AUTH.apiFetch('/api/alerts') : Promise.resolve(null);
     const [entries, alerts] = await Promise.all([AUTH.apiFetch('/api/list'), fetchAlerts]);
     const wishlist = entries.filter(e => e.status === 'wishlist');
-    wGrid.innerHTML = '';
-    if (!wishlist.length) {
-      wGrid.innerHTML = `<div class="empty-state"><div class="empty-icon">⭐</div><h3>${t('wishlist.empty_title')}</h3><p>${t('wishlist.empty_desc')}</p></div>`;
-    } else {
-      wishlist.forEach(e => wGrid.appendChild(renderCard(e, () => openModal(e.steam_appid), async () => {
+    let wPage = 1;
+    const W_PAGE = 21;
+
+    function renderWishlist() {
+      document.getElementById('wishlist-pagination')?.remove();
+      wGrid.innerHTML = '';
+      if (!wishlist.length) {
+        wGrid.innerHTML = `<div class="empty-state"><div class="empty-icon">⭐</div><h3>${t('wishlist.empty_title')}</h3><p>${t('wishlist.empty_desc')}</p></div>`;
+        return;
+      }
+      const totalPages = Math.ceil(wishlist.length / W_PAGE);
+      if (wPage > totalPages) wPage = 1;
+      wishlist.slice((wPage - 1) * W_PAGE, wPage * W_PAGE).forEach(e => wGrid.appendChild(renderCard(e, () => openModal(e.steam_appid), async () => {
         await AUTH.apiFetch(`/api/list/${e.steam_appid}`, { method: 'DELETE' });
         loadWishlist();
         showToast(t('toast.game_removed'));
       })));
+      if (totalPages > 1) {
+        const pag = document.createElement('div');
+        pag.id = 'wishlist-pagination';
+        pag.className = 'pagination';
+        pag.appendChild(mkBtn(t('btn.prev'), wPage === 1, () => { wPage--; renderWishlist(); wGrid.scrollIntoView({behavior:'smooth',block:'start'}); }));
+        for (let p = 1; p <= totalPages; p++) {
+          pag.appendChild(mkBtn(p, false, () => { wPage = p; renderWishlist(); wGrid.scrollIntoView({behavior:'smooth',block:'start'}); }, p === wPage));
+        }
+        pag.appendChild(mkBtn(t('btn.next'), wPage === totalPages, () => { wPage++; renderWishlist(); wGrid.scrollIntoView({behavior:'smooth',block:'start'}); }));
+        wGrid.after(pag);
+      }
     }
+    renderWishlist();
 
     const phSection = document.getElementById('price-history-section');
     if (!AUTH.user.is_premium) {
@@ -1994,14 +2039,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ── Onboarding Tour ───────────────────────────────────
 const TOUR_STEPS = [
-  { target: null,           get title() { return t('tour.step0.title'); }, get text() { return t('tour.step0.text'); } },
-  { target: '#games-grid',  get title() { return t('tour.step1.title'); }, get text() { return t('tour.step1.text'); }, pos: 'top' },
-  { target: '#genre-pills', get title() { return t('tour.step2.title'); }, get text() { return t('tour.step2.text'); }, pos: 'bottom' },
-  { target: '#nav-explore', get title() { return t('tour.step3.title'); }, get text() { return t('tour.step3.text'); }, pos: 'bottom' },
-  { target: '#nav-ranking', get title() { return t('tour.step4.title'); }, get text() { return t('tour.step4.text'); }, pos: 'bottom' },
-  { target: '#nav-community', get title() { return t('tour.step5.title'); }, get text() { return t('tour.step5.text'); }, pos: 'bottom' },
-  { target: '#nav-ideas',   get title() { return t('tour.step6.title'); }, get text() { return t('tour.step6.text'); }, pos: 'bottom' },
-  { target: null,           get title() { return t('tour.step7.title'); }, get text() { return t('tour.step7.text'); } },
+  { target: null,             get title() { return t('tour.step0.title'); }, get text() { return t('tour.step0.text'); } },
+  { target: '#games-grid',   get title() { return t('tour.step1.title'); }, get text() { return t('tour.step1.text'); }, pos: 'top' },
+  { target: '#search-input', get title() { return t('tour.step2.title'); }, get text() { return t('tour.step2.text'); }, pos: 'bottom' },
+  { target: '#nav-explore',  get title() { return t('tour.step3.title'); }, get text() { return t('tour.step3.text'); }, pos: 'bottom' },
+  { target: '#nav-ranking',  get title() { return t('tour.step4.title'); }, get text() { return t('tour.step4.text'); }, pos: 'bottom' },
+  { target: '#nav-community',get title() { return t('tour.step5.title'); }, get text() { return t('tour.step5.text'); }, pos: 'bottom' },
+  { target: '#nav-ideas',    get title() { return t('tour.step6.title'); }, get text() { return t('tour.step6.text'); }, pos: 'bottom' },
+  { target: null,            get title() { return t('tour.step7.title'); }, get text() { return t('tour.step7.text'); } },
   { target: '#btn-register', get title() { return t('tour.step8.title'); }, get text() { return t('tour.step8.text'); }, pos: 'bottom', cta: true },
 ];
 

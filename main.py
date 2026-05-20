@@ -1344,19 +1344,29 @@ async def genres_previews():
     categories = await get_category_list()
 
     async def fetch_one(genre):
-        cache_key = f"genre_preview_spy:{genre['key']}"
-        cached = cache_get(cache_key)
+        spy_type = genre["spy_type"]
+        spy_slug = genre["spy_slug"]
+        preview_key = f"genre_preview_spy:{spy_type}:{spy_slug}"
+        cached = cache_get(preview_key)
         if cached is not None:
             return cached
         try:
-            data = await get(STEAMSPY, {"request": genre["spy_type"], genre["spy_type"]: genre["spy_slug"]})
-            games = [g for g in data.values() if g.get("appid")]
+            list_key = f"spy_list:{spy_type}:{spy_slug}"
+            all_games = cache_get(list_key)
+            if all_games is None:
+                data = await get(STEAMSPY, {"request": spy_type, spy_type: spy_slug})
+                all_games = [
+                    {"id": g["appid"], "name": g["name"], "image": img(g["appid"]),
+                     "playtime": round(g.get("average_forever", 0) / 60, 1), "price": None}
+                    for g in data.values() if g.get("appid")
+                ]
+                cache_set(list_key, all_games, ttl_hours=24)
             out = {
                 "key": genre["key"],
-                "count": len(games),
-                "cover_img": img(games[0]["appid"]) if games else None,
+                "count": len(all_games),
+                "cover_img": all_games[0]["image"] if all_games else None,
             }
-            cache_set(cache_key, out, ttl_hours=24)
+            cache_set(preview_key, out, ttl_hours=24)
             return out
         except Exception:
             return {"key": genre["key"], "count": 0, "cover_img": None}

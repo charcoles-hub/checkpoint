@@ -678,7 +678,7 @@ def global_activity():
 @app.get("/api/admin/clear-cache")
 def clear_cache():
     db = get_db()
-    db.execute("DELETE FROM api_cache WHERE key LIKE 'genre_%' OR key LIKE 'rawg_categories%'")
+    db.execute("DELETE FROM api_cache WHERE key LIKE ? OR key LIKE ?", ('genre_%', 'rawg_categories%'))
     db.commit()
     db.close()
     return {"ok": True}

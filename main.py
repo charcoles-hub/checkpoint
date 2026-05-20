@@ -190,7 +190,7 @@ async def rawg_games_page(rawg_type: str, rawg_slug: str, page: int, cache_key: 
         data = await get(f"{RAWG}/games", {
             "key": RAWG_KEY, rawg_type: rawg_slug,
             "page": page, "page_size": 24,
-            "ordering": "-rating", "platforms": 4,
+            "ordering": "-added", "platforms": 4,
         })
         results = data.get("results", [])
         total = data.get("count", 0)

@@ -2,6 +2,7 @@ import asyncio
 import os
 import re
 import secrets
+import time
 import stripe
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
@@ -1121,18 +1122,28 @@ from fastapi.responses import FileResponse
 from urllib.parse import unquote
 
 GENRES = [
-    {"name": "Acción",       "key": "Action",               "emoji": "⚔️"},
-    {"name": "Aventura",     "key": "Adventure",             "emoji": "🗺️"},
-    {"name": "RPG",          "key": "RPG",                   "emoji": "🧙"},
-    {"name": "Estrategia",   "key": "Strategy",              "emoji": "♟️"},
-    {"name": "Simulación",   "key": "Simulation",            "emoji": "🎮"},
-    {"name": "Deportes",     "key": "Sports",                "emoji": "⚽"},
-    {"name": "Indie",        "key": "Indie",                 "emoji": "🎨"},
-    {"name": "Puzzle",       "key": "Puzzle",                "emoji": "🧩"},
-    {"name": "Carreras",     "key": "Racing",                "emoji": "🏎️"},
-    {"name": "Multijugador", "key": "Massively Multiplayer", "emoji": "🌐"},
-    {"name": "Gratis",       "key": "Free to Play",          "emoji": "🎁"},
+    {"name": "Acción",            "key": "Action",               "emoji": "⚔️"},
+    {"name": "Aventura",          "key": "Adventure",            "emoji": "🗺️"},
+    {"name": "RPG",               "key": "RPG",                  "emoji": "🧙"},
+    {"name": "Estrategia",        "key": "Strategy",             "emoji": "♟️"},
+    {"name": "Simulación",        "key": "Simulation",           "emoji": "🎮"},
+    {"name": "Deportes",          "key": "Sports",               "emoji": "⚽"},
+    {"name": "Indie",             "key": "Indie",                "emoji": "🎨"},
+    {"name": "Casual",            "key": "Casual",               "emoji": "😌"},
+    {"name": "Carreras",          "key": "Racing",               "emoji": "🏎️"},
+    {"name": "Multijugador",      "key": "Massively Multiplayer","emoji": "🌐"},
+    {"name": "Gratis",            "key": "Free to Play",         "emoji": "🎁"},
+    {"name": "Acceso Anticipado", "key": "Early Access",         "emoji": "🚧"},
+    {"name": "Puzzle",            "key": "Puzzle",               "emoji": "🧩",  "type": "tag"},
+    {"name": "Terror",            "key": "Horror",               "emoji": "👻",  "type": "tag"},
+    {"name": "Mundo Abierto",     "key": "Open World",           "emoji": "🌍",  "type": "tag"},
+    {"name": "Roguelike",         "key": "Roguelike",            "emoji": "🎲",  "type": "tag"},
+    {"name": "Plataformas",       "key": "Platformer",           "emoji": "🦘",  "type": "tag"},
+    {"name": "Shooters",          "key": "Shooter",              "emoji": "🔫",  "type": "tag"},
+    {"name": "Supervivencia",     "key": "Survival",             "emoji": "🌿",  "type": "tag"},
 ]
+
+_GENRE_MAP = {g["key"]: g for g in GENRES}
 
 
 @app.get("/api/genres")
@@ -1140,11 +1151,43 @@ def list_genres():
     return GENRES
 
 
+_previews_cache: dict | None = None
+_previews_ts: float = 0.0
+
+@app.get("/api/genres/previews")
+async def genres_previews():
+    global _previews_cache, _previews_ts
+    if _previews_cache and (time.time() - _previews_ts) < 3600:
+        return _previews_cache
+
+    def parse_owners(s):
+        try: return int(s.split("..")[0].replace(",", "").replace(" ", "").strip())
+        except: return 0
+
+    async def fetch_one(genre):
+        gtype = genre.get("type", "genre")
+        params = {"request": gtype, gtype: genre["key"]}
+        try:
+            data = await get(STEAMSPY, params)
+            games = sorted(data.values(), key=lambda g: parse_owners(g.get("owners", "0")), reverse=True)
+            first = games[0] if games else None
+            return {"key": genre["key"], "count": len(games),
+                    "cover_appid": first["appid"] if first else None}
+        except Exception:
+            return {"key": genre["key"], "count": 0, "cover_appid": None}
+
+    results = await asyncio.gather(*[fetch_one(g) for g in GENRES])
+    _previews_cache = {r["key"]: r for r in results}
+    _previews_ts = time.time()
+    return _previews_cache
+
+
 @app.get("/api/genres/{genre_key}")
 async def games_by_genre(genre_key: str, page: int = 1):
     genre_key = unquote(genre_key)
+    gtype = _GENRE_MAP.get(genre_key, {}).get("type", "genre")
     try:
-        data = await get(STEAMSPY, {"request": "genre", "genre": genre_key})
+        data = await get(STEAMSPY, {"request": gtype, gtype: genre_key})
     except Exception:
         return {"results": [], "count": 0}
 

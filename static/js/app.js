@@ -366,26 +366,27 @@ async function loadExplore() {
   content.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
 
   try {
-    if (!genreCache) genreCache = await AUTH.apiFetch('/api/genres');
-    // Get a preview image for each genre (first game's image)
-    const previews = await Promise.allSettled(
-      genreCache.map(g => AUTH.apiFetch(`/api/genres/${encodeURIComponent(g.key)}?page=1`))
-    );
+    const [genres, previews] = await Promise.all([
+      genreCache ? Promise.resolve(genreCache) : AUTH.apiFetch('/api/genres'),
+      AUTH.apiFetch('/api/genres/previews')
+    ]);
+    if (!genreCache) genreCache = genres;
 
     content.innerHTML = '';
     const genreGrid = document.createElement('div');
     genreGrid.className = 'genre-grid';
 
-    genreCache.forEach((genre, i) => {
-      const result = previews[i];
-      const coverImg = result.status === 'fulfilled' && result.value.results?.length
-        ? result.value.results[0].image : '';
-      const count = result.status === 'fulfilled' ? result.value.count : 0;
+    genres.forEach(genre => {
+      const preview = previews[genre.key] || {};
+      const coverImg = preview.cover_appid
+        ? `https://cdn.akamai.steamstatic.com/steam/apps/${preview.cover_appid}/header.jpg`
+        : '';
+      const count = preview.count || 0;
 
       const card = document.createElement('div');
       card.className = 'genre-card';
       card.innerHTML = `
-        ${coverImg ? `<img class="genre-card-bg" src="${coverImg}" alt="${genre.name}" />` : ''}
+        ${coverImg ? `<img class="genre-card-bg" src="${coverImg}" alt="${genre.name}" loading="lazy" />` : ''}
         <div class="genre-card-overlay"></div>
         <div class="genre-card-body">
           <span class="genre-emoji">${genre.emoji}</span>

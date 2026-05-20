@@ -283,13 +283,24 @@ def me(user=Depends(require_auth)):
     return _pub(user)
 
 
+ALLOWED_AVATAR_COLORS = {"", "red", "orange", "yellow", "green", "teal", "blue", "indigo", "pink", "slate"}
+ALLOWED_AVATAR_ICONS  = {"", "👾", "🎮", "🕹️", "🗡️", "🧙", "🐉", "🤖", "🦊", "🧟", "⚔️", "🏹", "🔮", "💀", "🛡️", "👑", "🌙", "🦅", "🐺", "💎", "🔥"}
+
 class ProfileIn(BaseModel):
     username: str = Field(min_length=3, max_length=30)
     bio: str = Field(default="", max_length=160)
+    avatar_color: str = Field(default="", max_length=20)
+    avatar_icon: str = Field(default="", max_length=10)
 
 @app.patch("/api/auth/profile")
 @limiter.limit("10/minute")
 def update_profile(request: Request, body: ProfileIn, user=Depends(require_auth)):
+    if body.avatar_color not in ALLOWED_AVATAR_COLORS:
+        raise HTTPException(400, "Color de avatar no válido")
+    if body.avatar_icon and body.avatar_icon not in ALLOWED_AVATAR_ICONS:
+        raise HTTPException(400, "Icono de avatar no válido")
+    if body.avatar_icon and not user.get("is_premium"):
+        raise HTTPException(403, "Los iconos de perfil son exclusivos de Premium")
     db = get_db()
     username_changing = body.username != user["username"]
     if username_changing:
@@ -303,12 +314,14 @@ def update_profile(request: Request, body: ProfileIn, user=Depends(require_auth)
             db.close()
             raise HTTPException(429, f"Puedes cambiar tu nombre de nuevo el {next_change.strftime('%d/%m/%Y')}")
     if username_changing:
-        db.execute("UPDATE users SET username=?, bio=?, username_changed_at=CURRENT_TIMESTAMP WHERE id=?", (body.username, body.bio, user["id"]))
+        db.execute("UPDATE users SET username=?, bio=?, avatar_color=?, avatar_icon=?, username_changed_at=CURRENT_TIMESTAMP WHERE id=?",
+                   (body.username, body.bio, body.avatar_color, body.avatar_icon, user["id"]))
     else:
-        db.execute("UPDATE users SET bio=? WHERE id=?", (body.bio, user["id"]))
+        db.execute("UPDATE users SET bio=?, avatar_color=?, avatar_icon=? WHERE id=?",
+                   (body.bio, body.avatar_color, body.avatar_icon, user["id"]))
     db.commit(); db.close()
     changed_at_new = datetime.now(timezone.utc).isoformat() if username_changing else _dt_str(user.get("username_changed_at"))
-    return _pub({**user, "username": body.username, "bio": body.bio, "username_changed_at": changed_at_new})
+    return _pub({**user, "username": body.username, "bio": body.bio, "avatar_color": body.avatar_color, "avatar_icon": body.avatar_icon, "username_changed_at": changed_at_new})
 
 @app.patch("/api/auth/settings")
 def update_settings(body: dict, user=Depends(require_auth)):
@@ -322,7 +335,7 @@ def update_settings(body: dict, user=Depends(require_auth)):
     return {"ok": True}
 
 
-def _pub(u): return {"id": u["id"], "username": u["username"], "email": u["email"], "notify_ntfy": u.get("notify_ntfy"), "is_premium": bool(u.get("is_premium", 0)), "steam_id": u.get("steam_id"), "bio": u.get("bio") or "", "username_changed_at": _dt_str(u.get("username_changed_at"))}
+def _pub(u): return {"id": u["id"], "username": u["username"], "email": u["email"], "notify_ntfy": u.get("notify_ntfy"), "is_premium": bool(u.get("is_premium", 0)), "steam_id": u.get("steam_id"), "bio": u.get("bio") or "", "username_changed_at": _dt_str(u.get("username_changed_at")), "avatar_color": u.get("avatar_color") or "", "avatar_icon": u.get("avatar_icon") or ""}
 
 
 def _parse_dt(val):
@@ -362,7 +375,7 @@ def search_users(q: str = "", user=Depends(current_user)):
     db = get_db()
     exclude_id = user["id"] if user else -1
     rows = db.execute(
-        "SELECT id, username FROM users WHERE username LIKE ? AND id != ? LIMIT 10",
+        "SELECT id, username, is_premium, avatar_color, avatar_icon FROM users WHERE username LIKE ? AND id != ? LIMIT 10",
         (f"%{q}%", exclude_id)
     ).fetchall()
     results = []
@@ -382,7 +395,7 @@ def search_users(q: str = "", user=Depends(current_user)):
 @app.get("/api/users/{username}")
 def public_profile(username: str, user=Depends(current_user)):
     db = get_db()
-    target = db.execute("SELECT id, username, created_at FROM users WHERE username=?", (username,)).fetchone()
+    target = db.execute("SELECT id, username, created_at, is_premium, avatar_color, avatar_icon FROM users WHERE username=?", (username,)).fetchone()
     if not target:
         raise HTTPException(404, "Usuario no encontrado")
     target = dict(target)

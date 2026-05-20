@@ -2,6 +2,29 @@ function escHtml(s) {
   return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// ── Avatar helpers ────────────────────────────────────
+const AVATAR_COLORS = {
+  '':       'linear-gradient(135deg,var(--purple),var(--cyan))',
+  red:      '#ef4444',
+  orange:   '#f97316',
+  yellow:   '#eab308',
+  green:    '#22c55e',
+  teal:     '#14b8a6',
+  blue:     '#3b82f6',
+  indigo:   '#6366f1',
+  pink:     '#ec4899',
+  slate:    '#64748b',
+};
+const AVATAR_ICONS = ['👾','🎮','🕹️','🗡️','🧙','🐉','🤖','🦊','🧟','⚔️','🏹','🔮','💀','🛡️','👑','🌙','🦅','🐺','💎','🔥'];
+
+function avatarBg(user) {
+  return AVATAR_COLORS[user?.avatar_color ?? ''] ?? AVATAR_COLORS[''];
+}
+function avatarContent(user, fontSize) {
+  if (user?.avatar_icon) return `<span style="font-size:${fontSize};line-height:1">${user.avatar_icon}</span>`;
+  return (user?.username?.[0] ?? '?').toUpperCase();
+}
+
 const grid = document.getElementById('games-grid');
 const searchInput = document.getElementById('search-input');
 const sectionTitle = document.getElementById('section-title');
@@ -608,6 +631,7 @@ async function openModal(gameId) {
       })});
       document.getElementById('rating-form').style.display = 'none';
       showToast(rating ? t('toast.saved_rating', {n: rating}) : t('toast.saved'));
+      if (document.getElementById('view-profile-me').style.display !== 'none') loadMyList();
     });
     document.getElementById('btn-skip-rating').addEventListener('click', () => {
       document.getElementById('rating-form').style.display = 'none';
@@ -743,6 +767,10 @@ async function saveEntry(g, status) {
   await AUTH.apiFetch('/api/list', { method: 'POST', body: JSON.stringify({
     steam_appid: g.id, game_name: g.name, game_image: g.image, status
   })});
+  if (document.getElementById('view-profile-me').style.display !== 'none') {
+    if (profileMeTab === 'mygames') loadMyList();
+    else if (profileMeTab === 'wishlist') loadWishlist();
+  }
 }
 
 function closeModal() { modalOverlay.classList.remove('open'); document.body.style.overflow = ''; }
@@ -750,9 +778,16 @@ function closeModal() { modalOverlay.classList.remove('open'); document.body.sty
 // ── Mi Perfil ─────────────────────────────────────────
 let profileMeTab = 'mygames';
 
+function _refreshProfileMeAvatar() {
+  const el = document.getElementById('profile-me-avatar');
+  if (!el) return;
+  el.style.background = avatarBg(AUTH.user);
+  el.innerHTML = avatarContent(AUTH.user, '1.7rem');
+}
+
 function loadProfileMe() {
   if (!AUTH.user) { showView('home'); AUTH.showModal('login'); return; }
-  document.getElementById('profile-me-avatar').textContent = AUTH.user.username[0].toUpperCase();
+  _refreshProfileMeAvatar();
   document.getElementById('profile-me-name').textContent = AUTH.user.username;
   document.getElementById('profile-me-bio-display').textContent = AUTH.user.bio || '';
 
@@ -826,6 +861,33 @@ async function loadMyAccount() {
       <textarea id="account-bio" class="field-input" rows="3" maxlength="160" placeholder="${t('profile_me.bio_placeholder')}" style="resize:vertical;margin-bottom:6px">${escHtml(AUTH.user.bio || '')}</textarea>
       <div style="text-align:right;font-size:0.78rem;color:var(--muted);margin-bottom:22px"><span id="bio-char-count">${(AUTH.user.bio || '').length}</span>/160</div>
 
+      <label style="font-size:0.85rem;color:var(--muted);display:block;margin-bottom:10px">${t('profile_me.label_color')}</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px">
+        ${Object.entries(AVATAR_COLORS).map(([key, val]) => `
+          <button class="avatar-color-swatch ${(AUTH.user.avatar_color ?? '') === key ? 'selected' : ''}"
+            data-color="${key}"
+            style="width:32px;height:32px;border-radius:50%;background:${val};border:3px solid ${(AUTH.user.avatar_color ?? '') === key ? '#fff' : 'transparent'};cursor:pointer;transition:border-color .15s"
+            title="${key || 'default'}"></button>
+        `).join('')}
+      </div>
+
+      ${AUTH.user.is_premium ? `
+      <label style="font-size:0.85rem;color:var(--muted);display:block;margin-bottom:10px">${t('profile_me.label_icon')} <span class="premium-badge">⭐</span></label>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+        <button class="avatar-icon-btn ${!AUTH.user.avatar_icon ? 'selected' : ''}" data-icon=""
+          style="width:38px;height:38px;border-radius:8px;background:var(--surface2);border:2px solid ${!AUTH.user.avatar_icon ? 'var(--purple)' : 'var(--border)'};cursor:pointer;font-size:1rem">
+          ${(AUTH.user.username[0] ?? '?').toUpperCase()}
+        </button>
+        ${AVATAR_ICONS.map(icon => `
+          <button class="avatar-icon-btn ${AUTH.user.avatar_icon === icon ? 'selected' : ''}" data-icon="${icon}"
+            style="width:38px;height:38px;border-radius:8px;background:var(--surface2);border:2px solid ${AUTH.user.avatar_icon === icon ? 'var(--purple)' : 'var(--border)'};cursor:pointer;font-size:1.3rem">
+            ${icon}
+          </button>
+        `).join('')}
+      </div>
+      <p style="font-size:0.78rem;color:var(--muted2);margin-bottom:22px">${t('profile_me.icon_hint')}</p>
+      ` : ''}
+
       <div style="display:flex;align-items:center;gap:14px;margin-bottom:32px">
         <button class="btn-primary" id="btn-save-account">${t('profile_me.btn_save')}</button>
         <span id="account-msg" style="display:none;font-size:0.9rem"></span>
@@ -834,7 +896,7 @@ async function loadMyAccount() {
       <div style="margin-bottom:32px">
         <p style="font-size:0.78rem;color:var(--muted2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:14px">${t('profile_me.section_preview')}</p>
         <div id="community-preview-card" style="padding:14px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;gap:14px">
-          <div class="user-avatar-sm">${AUTH.user.username[0].toUpperCase()}</div>
+          <div class="user-avatar-sm" style="background:${avatarBg(AUTH.user)}">${avatarContent(AUTH.user, '1rem')}</div>
           <div style="flex:1">
             <span class="user-row-name">${escHtml(AUTH.user.username)}</span>
             ${AUTH.user.is_premium ? '<span class="premium-badge" style="font-size:0.8rem">⭐</span>' : ''}
@@ -864,13 +926,17 @@ async function loadMyAccount() {
     if (!username) return;
     btn.disabled = true; btn.textContent = t('profile_me.btn_saving');
     try {
-      const updated = await AUTH.apiFetch('/api/auth/profile', { method: 'PATCH', body: JSON.stringify({ username, bio }) });
+      const avatarColor = document.querySelector('.avatar-color-swatch.selected')?.dataset.color ?? AUTH.user.avatar_color ?? '';
+      const avatarIcon  = document.querySelector('.avatar-icon-btn.selected')?.dataset.icon ?? '';
+      const updated = await AUTH.apiFetch('/api/auth/profile', { method: 'PATCH', body: JSON.stringify({ username, bio, avatar_color: avatarColor, avatar_icon: avatarIcon }) });
       AUTH.user.username = updated.username;
       AUTH.user.bio = updated.bio;
       AUTH.user.username_changed_at = updated.username_changed_at;
+      AUTH.user.avatar_color = updated.avatar_color;
+      AUTH.user.avatar_icon = updated.avatar_icon;
       localStorage.setItem('gl_user', JSON.stringify(AUTH.user));
       AUTH.updateUI();
-      document.getElementById('profile-me-avatar').textContent = AUTH.user.username[0].toUpperCase();
+      _refreshProfileMeAvatar();
       document.getElementById('profile-me-name').textContent = AUTH.user.username;
       document.getElementById('profile-me-bio-display').textContent = AUTH.user.bio || '';
       msg.innerHTML = `<span style="color:var(--cyan)">✓ ${t('profile_me.saved')}</span>`;
@@ -885,6 +951,24 @@ async function loadMyAccount() {
 
   document.getElementById('btn-copy-profile-acc').addEventListener('click', () => {
     navigator.clipboard.writeText(profileUrl); showToast(t('toast.link_copied'));
+  });
+
+  document.querySelectorAll('.avatar-color-swatch').forEach(swatch => {
+    swatch.addEventListener('click', () => {
+      document.querySelectorAll('.avatar-color-swatch').forEach(s => {
+        s.classList.remove('selected'); s.style.borderColor = 'transparent';
+      });
+      swatch.classList.add('selected'); swatch.style.borderColor = '#fff';
+    });
+  });
+
+  document.querySelectorAll('.avatar-icon-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.avatar-icon-btn').forEach(b => {
+        b.classList.remove('selected'); b.style.borderColor = 'var(--border)';
+      });
+      btn.classList.add('selected'); btn.style.borderColor = 'var(--purple)';
+    });
   });
 
   document.getElementById('btn-preview-from-account').addEventListener('click', () => {
@@ -1233,7 +1317,7 @@ async function loadFollowingSection() {
         const row = document.createElement('div');
         row.className = 'user-row';
         row.innerHTML = `
-          <div class="user-avatar-sm">${u.username[0].toUpperCase()}</div>
+          <div class="user-avatar-sm" style="background:${avatarBg(u)}">${avatarContent(u, '1rem')}</div>
           <div style="flex:1">
             <span class="user-row-name">${u.username}</span>
             <span style="color:var(--muted);font-size:0.8rem;margin-left:8px">${t('following.games', {n: u.total_games})}</span>
@@ -1316,7 +1400,7 @@ async function loadProfile(username) {
     const joined = new Date(user.created_at).toLocaleDateString(t('time.locale'), { month: 'long', year: 'numeric' });
     header.innerHTML = `
       <div class="profile-hero">
-        <div class="profile-avatar">${user.username[0].toUpperCase()}</div>
+        <div class="profile-avatar" style="background:${avatarBg(user)}">${avatarContent(user, '2rem')}</div>
         <div style="flex:1">
           <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
             <h2 class="profile-name">${user.username}${user.is_premium ? ' <span class="premium-badge">⭐</span>' : ''}</h2>
@@ -1409,7 +1493,7 @@ async function loadCommunity() {
         const row = document.createElement('div');
         row.className = 'user-row';
         row.innerHTML = `
-          <div class="user-avatar-sm">${u.username[0].toUpperCase()}</div>
+          <div class="user-avatar-sm" style="background:${avatarBg(u)}">${avatarContent(u, '1rem')}</div>
           <div style="flex:1">
             <span class="user-row-name">${u.username}</span>
             ${u.is_premium ? '<span class="premium-badge" style="font-size:0.8rem">⭐</span>' : ''}

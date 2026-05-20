@@ -383,6 +383,7 @@ async function loadExplore() {
   title.textContent = t('explore.title');
   sortTabs.style.display = 'none';
   content.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  document.getElementById('explore-pagination').innerHTML = '';
 
   try {
     const [genres, previews] = await Promise.all([

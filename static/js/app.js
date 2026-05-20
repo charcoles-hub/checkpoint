@@ -1069,6 +1069,15 @@ async function loadMyAccount() {
   AUTH.apiFetch(`/api/users/${AUTH.user.username}`).then(({ stats }) => {
     const el = document.getElementById('preview-games-count');
     if (el) el.textContent = t('following.games', { n: stats.total });
+    const statsEl = document.getElementById('profile-me-stats');
+    if (statsEl) statsEl.innerHTML = `
+      <div class="stat-box"><div class="stat-num">${stats.played || 0}</div><div class="stat-label">${t('profile.stat.played')}</div></div>
+      <div class="stat-box"><div class="stat-num">${stats.playing || 0}</div><div class="stat-label">${t('profile.stat.playing')}</div></div>
+      <div class="stat-box"><div class="stat-num">${stats.wishlist || 0}</div><div class="stat-label">${t('profile.stat.wishlist')}</div></div>
+      ${stats.abandoned ? `<div class="stat-box"><div class="stat-num">${stats.abandoned}</div><div class="stat-label">${t('status.abandoned')}</div></div>` : ''}
+      ${stats.avg_rating ? `<div class="stat-box"><div class="stat-num">${stats.avg_rating}</div><div class="stat-label">${t('profile.stat.avg')}</div></div>` : ''}
+      ${stats.total_playtime > 0 ? `<div class="stat-box"><div class="stat-num">${Math.round(stats.total_playtime/60)}h</div><div class="stat-label">${t('profile.stat.steam')}</div></div>` : ''}
+    `;
   }).catch(() => {});
 }
 

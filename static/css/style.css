@@ -773,8 +773,8 @@ body {
 .hamburger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
 
 @media (max-width: 640px) {
+  /* ── Nav ── */
   .hamburger { display: flex; }
-
   .nav-right {
     display: none;
     position: absolute; top: 64px; left: 0; right: 0;
@@ -790,10 +790,56 @@ body {
   .user-menu { width: 100%; }
   .btn-user { width: 100%; text-align: center; }
 
-  .sort-tabs { display: none; }
-  .games-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
-  .hero { padding: 120px 16px 60px; }
+  /* ── Hero ── */
+  .hero { padding: 100px 16px 48px; }
+  .hero p { font-size: 1rem; }
+
+  /* ── Layout ── */
+  .games-section { padding: 0 16px 60px; }
+  .section-header { flex-direction: column; align-items: flex-start; }
+  .games-grid { grid-template-columns: repeat(auto-fill, minmax(155px, 1fr)); gap: 12px; }
+  .genre-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
   .list-tabs { flex-wrap: wrap; }
+
+  /* ── Sort tabs: scrollable instead of hidden ── */
+  .sort-tabs {
+    display: flex; overflow-x: auto;
+    -webkit-overflow-scrolling: touch; scrollbar-width: none;
+  }
+  .sort-tabs::-webkit-scrollbar { display: none; }
+  .sort-tab { white-space: nowrap; flex-shrink: 0; }
+
+  /* ── Modal: bottom sheet ── */
+  .modal-overlay { align-items: flex-end; padding: 0; }
+  .modal {
+    border-radius: 20px 20px 0 0; max-width: 100%;
+    max-height: 88vh; width: 100%;
+  }
+  .detail-title { font-size: 1.35rem; }
+  .detail-hero-img { max-height: 180px; }
+  .detail-actions { flex-direction: column; }
+  .detail-actions .btn-add,
+  .detail-actions .btn-wishlist,
+  .detail-actions .btn-abandoned { width: 100%; text-align: center; }
+
+  /* ── Profile ── */
+  .profile-hero { flex-direction: column; align-items: center; text-align: center; }
+  .profile-name { font-size: 1.4rem; }
+  .profile-stats { justify-content: center; }
+  .stat-box { padding: 12px 18px; }
+
+  /* ── Ranking ── */
+  .ranking-row { padding: 10px 12px; gap: 10px; }
+  .score-num { font-size: 1.4rem; }
+
+  /* ── Feed ── */
+  .feed-thumb { width: 60px; height: 34px; }
+
+  /* ── Alert rows ── */
+  .alert-row { flex-wrap: wrap; }
+
+  /* ── Toast ── */
+  .toast { width: calc(100% - 32px); text-align: center; }
 }
 
 /* ── ONBOARDING TOUR ─────────────────────────────────── */

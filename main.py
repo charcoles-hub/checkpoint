@@ -646,7 +646,10 @@ def global_activity():
 @app.get("/api/admin/clear-cache")
 def clear_cache():
     db = get_db()
-    db.execute("DELETE FROM api_cache WHERE key LIKE ? OR key LIKE ?", ('genre_%', 'spy_list:%'))
+    db.execute(
+        "DELETE FROM api_cache WHERE key LIKE ? OR key LIKE ? OR key LIKE ? OR key LIKE ?",
+        ('genre_%', 'spy_list:%', 'genre_preview_spy:%', 'genre_ranking_spy:%')
+    )
     db.commit()
     db.close()
     return {"ok": True}
@@ -1341,7 +1344,7 @@ async def genres_previews():
     categories = await get_category_list()
 
     async def fetch_one(genre):
-        cache_key = f"genre_preview:{genre['key']}"
+        cache_key = f"genre_preview_spy:{genre['key']}"
         cached = cache_get(cache_key)
         if cached is not None:
             return cached
@@ -1367,7 +1370,7 @@ async def games_by_genre(genre_key: str, page: int = 1):
     genre_key = unquote(genre_key)
     categories = await get_category_list()
     genre_info = next((c for c in categories if c["key"] == genre_key), {})
-    cache_key = f"genre_detail:{genre_key}:{page}"
+    cache_key = f"genre_detail_spy:{genre_key}:{page}"
 
     data = await steamspy_games_page(
         genre_info.get("spy_type", "genre"),
@@ -1396,7 +1399,7 @@ async def games_by_genre(genre_key: str, page: int = 1):
 @app.get("/api/genres/{genre_key}/ranking")
 async def genre_community_ranking(genre_key: str):
     genre_key = unquote(genre_key)
-    cache_key = f"genre_ranking:{genre_key}"
+    cache_key = f"genre_ranking_spy:{genre_key}"
     cached = cache_get(cache_key)
     if cached is not None:
         return cached
@@ -1408,7 +1411,7 @@ async def genre_community_ranking(genre_key: str):
 
     # Fetch 5 pages using same criteria as the listing tab (already cached)
     pages_data = await asyncio.gather(*[
-        steamspy_games_page(spy_type, spy_slug, p, f"genre_detail:{genre_key}:{p}")
+        steamspy_games_page(spy_type, spy_slug, p, f"genre_detail_spy:{genre_key}:{p}")
         for p in range(1, 6)
     ])
 

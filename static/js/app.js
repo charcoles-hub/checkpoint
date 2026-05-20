@@ -1794,7 +1794,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initGenrePills();
   setTimeout(() => {
     if (!AUTH.user && !localStorage.getItem('ck_tour_done')) startTour();
-  }, 1800);
+  }, 500);
 });
 
 
@@ -1808,7 +1808,7 @@ const TOUR_STEPS = [
   {
     target: '#games-grid',
     title: '🎮 Juegos populares',
-    text: 'Los juegos más jugados del momento. Haz clic en cualquiera para ver detalles, precio y añadirlo a tu lista.',
+    text: 'Los juegos más jugados del momento. Haz clic en cualquiera para ver detalles, precio actual y añadirlo a tu lista.',
     pos: 'top',
   },
   {
@@ -1830,9 +1830,21 @@ const TOUR_STEPS = [
     pos: 'bottom',
   },
   {
+    target: '#nav-community',
+    title: '👥 Comunidad y feed',
+    text: 'Sigue a otros jugadores y ve en tiempo real qué están jugando, qué han terminado y qué opinan.',
+    pos: 'bottom',
+  },
+  {
+    target: '#nav-ideas',
+    title: '💡 Ideas y roadmap',
+    text: 'Propón nuevas funcionalidades y vota las de otros. El desarrollo de Checkpoint lo decide la comunidad.',
+    pos: 'bottom',
+  },
+  {
     target: null,
     title: '⭐ Checkpoint Premium',
-    text: 'Con Premium desbloqueas alertas de precio ilimitadas, sincronización automática con Steam, exportar tu colección, historial de precios y más. Por solo 3,99€/mes.',
+    text: 'Por 3,99€/mes: alertas de precio ilimitadas, historial de precios de Steam y badge ⭐ en tu perfil.',
   },
   {
     target: '#btn-register',

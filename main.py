@@ -5,7 +5,9 @@ import secrets
 import stripe
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
-from fastapi import FastAPI, Depends, HTTPException, Request
+import base64
+import io
+from fastapi import FastAPI, Depends, HTTPException, Request, UploadFile, File
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -323,6 +325,45 @@ def update_profile(request: Request, body: ProfileIn, user=Depends(require_auth)
     changed_at_new = datetime.now(timezone.utc).isoformat() if username_changing else _dt_str(user.get("username_changed_at"))
     return _pub({**user, "username": body.username, "bio": body.bio, "avatar_color": body.avatar_color, "avatar_icon": body.avatar_icon, "username_changed_at": changed_at_new})
 
+AVATAR_MAX_BYTES = 2 * 1024 * 1024  # 2 MB
+AVATAR_ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp"}
+AVATAR_SIZE = 128  # px
+
+@app.post("/api/auth/avatar")
+async def upload_avatar(file: UploadFile = File(...), user=Depends(require_auth)):
+    if not user.get("is_premium"):
+        raise HTTPException(403, "Los avatares personalizados son exclusivos de Premium")
+    if file.content_type not in AVATAR_ALLOWED_TYPES:
+        raise HTTPException(400, "Formato no válido. Usa JPG, PNG o WebP")
+    data = await file.read()
+    if len(data) > AVATAR_MAX_BYTES:
+        raise HTTPException(400, "La imagen no puede superar los 2 MB")
+    try:
+        from PIL import Image
+        img = Image.open(io.BytesIO(data)).convert("RGB")
+        img.thumbnail((AVATAR_SIZE, AVATAR_SIZE), Image.LANCZOS)
+        # Crop to square from center
+        w, h = img.size
+        side = min(w, h)
+        left, top = (w - side) // 2, (h - side) // 2
+        img = img.crop((left, top, left + side, top + side))
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=85, optimize=True)
+        b64 = base64.b64encode(buf.getvalue()).decode()
+    except Exception:
+        raise HTTPException(400, "No se pudo procesar la imagen")
+    db = get_db()
+    db.execute("UPDATE users SET avatar_b64=? WHERE id=?", (b64, user["id"]))
+    db.commit(); db.close()
+    return {"avatar_b64": b64}
+
+@app.delete("/api/auth/avatar")
+def delete_avatar(user=Depends(require_auth)):
+    db = get_db()
+    db.execute("UPDATE users SET avatar_b64=NULL WHERE id=?", (user["id"],))
+    db.commit(); db.close()
+    return {"ok": True}
+
 @app.patch("/api/auth/settings")
 def update_settings(body: dict, user=Depends(require_auth)):
     allowed = {"notify_ntfy", "steam_id"}
@@ -335,7 +376,7 @@ def update_settings(body: dict, user=Depends(require_auth)):
     return {"ok": True}
 
 
-def _pub(u): return {"id": u["id"], "username": u["username"], "email": u["email"], "notify_ntfy": u.get("notify_ntfy"), "is_premium": bool(u.get("is_premium", 0)), "steam_id": u.get("steam_id"), "bio": u.get("bio") or "", "username_changed_at": _dt_str(u.get("username_changed_at")), "avatar_color": u.get("avatar_color") or "", "avatar_icon": u.get("avatar_icon") or ""}
+def _pub(u): return {"id": u["id"], "username": u["username"], "email": u["email"], "notify_ntfy": u.get("notify_ntfy"), "is_premium": bool(u.get("is_premium", 0)), "steam_id": u.get("steam_id"), "bio": u.get("bio") or "", "username_changed_at": _dt_str(u.get("username_changed_at")), "avatar_color": u.get("avatar_color") or "", "avatar_icon": u.get("avatar_icon") or "", "avatar_b64": u.get("avatar_b64") or ""}
 
 
 def _parse_dt(val):
@@ -395,7 +436,7 @@ def search_users(q: str = "", user=Depends(current_user)):
 @app.get("/api/users/{username}")
 def public_profile(username: str, user=Depends(current_user)):
     db = get_db()
-    target = db.execute("SELECT id, username, created_at, is_premium, avatar_color, avatar_icon FROM users WHERE username=?", (username,)).fetchone()
+    target = db.execute("SELECT id, username, created_at, is_premium, avatar_color, avatar_icon, avatar_b64 FROM users WHERE username=?", (username,)).fetchone()
     if not target:
         raise HTTPException(404, "Usuario no encontrado")
     target = dict(target)

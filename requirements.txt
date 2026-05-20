@@ -9,3 +9,5 @@ psycopg2-binary
 stripe
 slowapi
 resend
+Pillow
+python-multipart

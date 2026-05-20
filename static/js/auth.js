@@ -27,7 +27,8 @@ window.AUTH = {
   },
 
   async apiFetch(url, opts = {}) {
-    const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+    const isFormData = opts.body instanceof FormData;
+    const headers = isFormData ? {} : { 'Content-Type': 'application/json', ...(opts.headers || {}) };
     if (this.token) headers['Authorization'] = `Bearer ${this.token}`;
     const r = await fetch(url, { ...opts, headers });
     if (!r.ok) {
@@ -36,6 +37,7 @@ window.AUTH = {
       e.status = r.status;
       throw e;
     }
+    if (opts._raw) return r;
     return r.json();
   },
 

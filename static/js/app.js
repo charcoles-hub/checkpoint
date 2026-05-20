@@ -18,9 +18,11 @@ const AVATAR_COLORS = {
 const AVATAR_ICONS = ['👾','🎮','🕹️','🗡️','🧙','🐉','🤖','🦊','🧟','⚔️','🏹','🔮','💀','🛡️','👑','🌙','🦅','🐺','💎','🔥'];
 
 function avatarBg(user) {
+  if (user?.avatar_b64) return 'none';
   return AVATAR_COLORS[user?.avatar_color ?? ''] ?? AVATAR_COLORS[''];
 }
 function avatarContent(user, fontSize) {
+  if (user?.avatar_b64) return `<img src="data:image/jpeg;base64,${user.avatar_b64}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
   if (user?.avatar_icon) return `<span style="font-size:${fontSize};line-height:1">${user.avatar_icon}</span>`;
   return (user?.username?.[0] ?? '?').toUpperCase();
 }
@@ -861,6 +863,25 @@ async function loadMyAccount() {
       <textarea id="account-bio" class="field-input" rows="3" maxlength="160" placeholder="${t('profile_me.bio_placeholder')}" style="resize:vertical;margin-bottom:6px">${escHtml(AUTH.user.bio || '')}</textarea>
       <div style="text-align:right;font-size:0.78rem;color:var(--muted);margin-bottom:22px"><span id="bio-char-count">${(AUTH.user.bio || '').length}</span>/160</div>
 
+      ${AUTH.user.is_premium ? `
+      <label style="font-size:0.85rem;color:var(--muted);display:block;margin-bottom:10px">${t('profile_me.label_photo')} <span class="premium-badge">⭐</span></label>
+      <div style="display:flex;align-items:center;gap:16px;margin-bottom:8px">
+        <div style="width:56px;height:56px;border-radius:50%;overflow:hidden;background:${avatarBg(AUTH.user)};display:flex;align-items:center;justify-content:center;font-size:1.5rem;font-weight:700;color:#fff;flex-shrink:0" id="avatar-upload-preview">
+          ${avatarContent(AUTH.user, '1.5rem')}
+        </div>
+        <div style="flex:1">
+          <input type="file" id="avatar-file-input" accept="image/jpeg,image/png,image/webp" style="display:none">
+          <button class="btn-ghost" id="btn-pick-avatar" style="font-size:0.85rem;padding:7px 14px">${t('profile_me.btn_upload_avatar')}</button>
+          ${AUTH.user.avatar_b64 ? `<button class="btn-ghost" id="btn-delete-avatar" style="font-size:0.82rem;padding:7px 12px;color:var(--muted);margin-left:8px">${t('profile_me.btn_remove_avatar')}</button>` : ''}
+          <p style="font-size:0.77rem;color:var(--muted2);margin-top:6px">${t('profile_me.avatar_hint')}</p>
+        </div>
+      </div>
+      <label style="display:flex;align-items:flex-start;gap:8px;font-size:0.82rem;color:var(--muted);margin-bottom:24px;cursor:pointer">
+        <input type="checkbox" id="avatar-tos" style="margin-top:2px;flex-shrink:0">
+        ${t('profile_me.avatar_tos')}
+      </label>
+      ` : ''}
+
       <label style="font-size:0.85rem;color:var(--muted);display:block;margin-bottom:10px">${t('profile_me.label_color')}</label>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px">
         ${Object.entries(AVATAR_COLORS).map(([key, val]) => `
@@ -970,6 +991,46 @@ async function loadMyAccount() {
       btn.classList.add('selected'); btn.style.borderColor = 'var(--purple)';
     });
   });
+
+  const fileInput = document.getElementById('avatar-file-input');
+  const btnPick   = document.getElementById('btn-pick-avatar');
+  const btnDel    = document.getElementById('btn-delete-avatar');
+
+  if (btnPick && fileInput) {
+    btnPick.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', async () => {
+      const file = fileInput.files[0];
+      if (!file) return;
+      const tos = document.getElementById('avatar-tos');
+      if (!tos?.checked) { showToast(t('profile_me.avatar_tos_required')); return; }
+      const form = new FormData();
+      form.append('file', file);
+      btnPick.disabled = true; btnPick.textContent = t('profile_me.avatar_uploading');
+      try {
+        const res = await AUTH.apiFetch('/api/auth/avatar', { method: 'POST', body: form, _raw: true });
+        const { avatar_b64 } = await res.json();
+        AUTH.user.avatar_b64 = avatar_b64;
+        localStorage.setItem('gl_user', JSON.stringify(AUTH.user));
+        _refreshProfileMeAvatar();
+        loadMyAccount();
+        showToast(t('profile_me.avatar_saved'));
+      } catch (err) {
+        showToast(err.message || t('profile_me.avatar_error'));
+      } finally {
+        btnPick.disabled = false; btnPick.textContent = t('profile_me.btn_upload_avatar');
+      }
+    });
+  }
+
+  if (btnDel) {
+    btnDel.addEventListener('click', async () => {
+      await AUTH.apiFetch('/api/auth/avatar', { method: 'DELETE' });
+      AUTH.user.avatar_b64 = '';
+      localStorage.setItem('gl_user', JSON.stringify(AUTH.user));
+      _refreshProfileMeAvatar();
+      loadMyAccount();
+    });
+  }
 
   document.getElementById('btn-preview-from-account').addEventListener('click', () => {
     history.pushState({}, '', `/u/${AUTH.user.username}`);

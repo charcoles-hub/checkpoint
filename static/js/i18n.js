@@ -291,6 +291,9 @@ const STRINGS = {
     'contact.twitch_btn': 'Visitar canal de Twitch',
     'contact.footer_link': 'Contacto',
     'tour.replay': 'Iniciar tour',
+    'modal.price_history': 'Historial de precios',
+    'modal.price_history_empty': 'Aún no hay datos. Se irán acumulando con el tiempo.',
+    'modal.price_history_premium': 'Hazte Premium para ver el historial completo',
   },
 
   en: {
@@ -583,6 +586,9 @@ const STRINGS = {
     'contact.twitch_btn': 'Visit Twitch channel',
     'contact.footer_link': 'Contact',
     'tour.replay': 'Start tour',
+    'modal.price_history': 'Price history',
+    'modal.price_history_empty': 'No data yet. It will accumulate over time.',
+    'modal.price_history_premium': 'Go Premium to see full price history',
   }
 };
 

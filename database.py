@@ -147,6 +147,13 @@ def _init_sqlite():
             user_id         INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
             UNIQUE(suggestion_id, user_id)
         );
+        CREATE TABLE IF NOT EXISTS price_history (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            steam_appid INTEGER NOT NULL,
+            game_name   TEXT,
+            price_eur   REAL NOT NULL,
+            checked_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
     """)
     db.commit()
     db.close()
@@ -242,6 +249,13 @@ def _init_pg():
             suggestion_id   INTEGER NOT NULL REFERENCES suggestions(id) ON DELETE CASCADE,
             user_id         INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
             UNIQUE(suggestion_id, user_id)
+        )""",
+        """CREATE TABLE IF NOT EXISTS price_history (
+            id          SERIAL PRIMARY KEY,
+            steam_appid INTEGER NOT NULL,
+            game_name   TEXT,
+            price_eur   REAL NOT NULL,
+            checked_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )""",
     ]
     for stmt in stmts:

@@ -51,7 +51,11 @@ document.getElementById('nav-explore').addEventListener('click', () => { history
 document.getElementById('nav-community').addEventListener('click', () => { history.pushState({}, '', '/community'); showView('community'); loadCommunity(); closeMenu(); });
 document.getElementById('nav-ideas').addEventListener('click', () => { history.pushState({}, '', '/ideas'); showView('ideas'); loadIdeas(); closeMenu(); });
 document.getElementById('footer-contact').addEventListener('click', () => { history.pushState({}, '', '/contacto'); showView('contacto'); });
-document.getElementById('footer-tour').addEventListener('click', () => { localStorage.removeItem('ck_tour_done'); startTour(); });
+document.getElementById('footer-tour').addEventListener('click', () => {
+  localStorage.removeItem('ck_tour_done');
+  if (_tourEl) { _tourEl.remove(); _tourEl = null; document.removeEventListener('keydown', _tourKeyHandler); }
+  startTour();
+});
 
 function resetHome() {
   currentPage = 1; currentSearch = ''; currentGenre = ''; currentPlatform = ''; currentSort = 'popular';
@@ -566,6 +570,7 @@ async function openModal(gameId) {
         <button class="btn-ghost" id="btn-save-draft" style="padding:6px 14px;font-size:0.85rem">${t('modal.btn_draft')}</button>
       </div>` : ''}
       <div id="modal-reviews"></div>
+      ${myEntry?.status === 'wishlist' && AUTH.user ? '<div id="modal-price-history"></div>' : ''}
     `;
 
     buildStars('stars-container', 0);
@@ -654,6 +659,47 @@ async function openModal(gameId) {
       await AUTH.apiFetch(`/api/list/${g.id}/review`, { method: 'PATCH', body: JSON.stringify({ review }) });
       showToast(t('toast.review_saved'));
     });
+
+    // Price history (wishlist games, logged in)
+    if (myEntry?.status === 'wishlist' && AUTH.user) {
+      const phEl = document.getElementById('modal-price-history');
+      if (phEl) {
+        phEl.innerHTML = `<div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--border)"><div class="loading" style="padding:20px 0"><div class="spinner"></div></div></div>`;
+        AUTH.apiFetch(`/api/games/${gameId}/price-history`)
+          .then(({ history, is_premium }) => {
+            if (!history.length) {
+              phEl.innerHTML = `
+                <div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--border)">
+                  <h4 class="modal-section-title">📈 ${t('modal.price_history')}</h4>
+                  <p style="color:var(--muted);font-size:0.88rem">${t('modal.price_history_empty')}</p>
+                </div>`;
+              return;
+            }
+            const max = Math.max(...history.map(h => h.price_eur));
+            const min = Math.min(...history.map(h => h.price_eur));
+            const fmt = p => `${p.toFixed(2)}€`;
+            const bars = history.map(h => {
+              const pct = max > 0 ? Math.round((h.price_eur / max) * 100) : 50;
+              const d = new Date(h.checked_at).toLocaleDateString(t('time.locale'), { month: 'short', day: 'numeric' });
+              return `<div class="ph-col" title="${fmt(h.price_eur)} — ${d}">
+                <div class="ph-bar-wrap"><div class="ph-bar" style="height:${pct}%"></div></div>
+                <div class="ph-label">${fmt(h.price_eur)}</div>
+                <div class="ph-date">${d}</div>
+              </div>`;
+            }).join('');
+            const lock = !is_premium ? `<div class="ph-lock">⭐ ${t('modal.price_history_premium')}</div>` : '';
+            phEl.innerHTML = `
+              <div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--border)">
+                <h4 class="modal-section-title">📈 ${t('modal.price_history')}
+                  <span style="color:var(--muted);font-weight:400;margin-left:8px">${fmt(min)} – ${fmt(max)}</span>
+                </h4>
+                <div class="ph-chart">${bars}</div>
+                ${lock}
+              </div>`;
+          })
+          .catch(() => { phEl.innerHTML = ''; });
+      }
+    }
 
     // Community reviews (public)
     fetch(`/api/games/${gameId}/reviews`)
@@ -1100,10 +1146,13 @@ async function loadFollowingSection() {
         history.pushState({}, '', `/u/${u.username}`); showView('profile'); loadProfile(u.username);
       });
       row.querySelector('.btn-follow').addEventListener('click', async (e) => {
-        await AUTH.apiFetch(`/api/follow/${u.username}`, { method: 'DELETE' });
-        row.remove();
-        showToast(t('toast.unfollow', {u: u.username}));
-        followingLoaded = false;
+        if (!AUTH.user) { AUTH.showModal('login'); return; }
+        try {
+          await AUTH.apiFetch(`/api/follow/${u.username}`, { method: 'DELETE' });
+          row.remove();
+          showToast(t('toast.unfollow', {u: u.username}));
+          followingLoaded = false;
+        } catch (err) { if (err.status === 401) AUTH.showModal('login'); }
       });
       listEl.appendChild(row);
     });
@@ -1144,6 +1193,8 @@ async function loadFollowingSection() {
         `;
         const btn = row.querySelector('.btn-follow');
         btn.addEventListener('click', async () => {
+          if (!AUTH.user) { AUTH.showModal('login'); return; }
+          try {
           if (btn.classList.contains('following')) {
             await AUTH.apiFetch(`/api/follow/${u.username}`, { method: 'DELETE' });
             btn.classList.remove('following'); btn.textContent = t('following.btn_follow');
@@ -1153,6 +1204,7 @@ async function loadFollowingSection() {
             btn.classList.add('following'); btn.textContent = t('following.btn_following');
             showToast(t('toast.follow', {u: u.username}));
           }
+          } catch (err) { if (err.status === 401) AUTH.showModal('login'); }
           followingLoaded = false;
         });
         row.querySelector('.user-avatar-sm').addEventListener('click', () => {
@@ -1242,15 +1294,18 @@ async function loadProfile(username) {
     const followBtn = document.getElementById('btn-follow-profile');
     if (followBtn) {
       followBtn.addEventListener('click', async () => {
-        if (followBtn.classList.contains('following')) {
-          await AUTH.apiFetch(`/api/follow/${username}`, { method: 'DELETE' });
-          followBtn.classList.remove('following'); followBtn.textContent = t('profile.btn_follow');
-          showToast(t('toast.unfollow', {u: username}));
-        } else {
-          await AUTH.apiFetch(`/api/follow/${username}`, { method: 'POST' });
-          followBtn.classList.add('following'); followBtn.textContent = t('profile.btn_following');
-          showToast(t('toast.follow', {u: username}));
-        }
+        if (!AUTH.user) { AUTH.showModal('login'); return; }
+        try {
+          if (followBtn.classList.contains('following')) {
+            await AUTH.apiFetch(`/api/follow/${username}`, { method: 'DELETE' });
+            followBtn.classList.remove('following'); followBtn.textContent = t('profile.btn_follow');
+            showToast(t('toast.unfollow', {u: username}));
+          } else {
+            await AUTH.apiFetch(`/api/follow/${username}`, { method: 'POST' });
+            followBtn.classList.add('following'); followBtn.textContent = t('profile.btn_following');
+            showToast(t('toast.follow', {u: username}));
+          }
+        } catch (err) { if (err.status === 401) AUTH.showModal('login'); }
         followingLoaded = false;
       });
     }
@@ -1316,16 +1371,19 @@ async function loadCommunity() {
         const btn = row.querySelector('.btn-follow');
         if (btn) {
           btn.addEventListener('click', async () => {
-            if (btn.classList.contains('following')) {
-              await AUTH.apiFetch(`/api/follow/${u.username}`, { method: 'DELETE' });
-              btn.classList.remove('following'); btn.textContent = t('following.btn_follow');
-              showToast(t('toast.unfollow', {u: u.username}));
-            } else {
-              await AUTH.apiFetch(`/api/follow/${u.username}`, { method: 'POST' });
-              btn.classList.add('following'); btn.textContent = t('following.btn_following');
-              showToast(t('toast.follow', {u: u.username}));
-            }
-            communityLoaded = false;
+            if (!AUTH.user) { AUTH.showModal('login'); return; }
+            try {
+              if (btn.classList.contains('following')) {
+                await AUTH.apiFetch(`/api/follow/${u.username}`, { method: 'DELETE' });
+                btn.classList.remove('following'); btn.textContent = t('following.btn_follow');
+                showToast(t('toast.unfollow', {u: u.username}));
+              } else {
+                await AUTH.apiFetch(`/api/follow/${u.username}`, { method: 'POST' });
+                btn.classList.add('following'); btn.textContent = t('following.btn_following');
+                showToast(t('toast.follow', {u: u.username}));
+              }
+              communityLoaded = false;
+            } catch (err) { if (err.status === 401) AUTH.showModal('login'); }
           });
         }
         row.querySelector('.user-avatar-sm').addEventListener('click', () => {
@@ -1813,7 +1871,7 @@ function _tourNext() {
     _renderTourStep();
   } else {
     endTour();
-    AUTH.showModal('register');
+    if (!AUTH.user) AUTH.showModal('register');
   }
 }
 
@@ -1848,7 +1906,7 @@ function _renderTourStep() {
 
   popup.className = '';
   const target = document.querySelector(step.target);
-  if (!target) { _tourStep++; if (_tourStep < TOUR_STEPS.length) _renderTourStep(); return; }
+  if (!target || getComputedStyle(target).display === 'none') { _tourStep++; if (_tourStep < TOUR_STEPS.length) _renderTourStep(); return; }
 
   // Scroll target into view, then position
   target.scrollIntoView({ behavior: 'smooth', block: 'center' });

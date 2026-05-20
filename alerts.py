@@ -68,6 +68,10 @@ async def check_alerts():
         if price is None:
             continue
         db.execute("UPDATE price_alerts SET current_price = ? WHERE id = ?", (price, a["id"]))
+        db.execute(
+            "INSERT INTO price_history (steam_appid, game_name, price_eur) VALUES (?, ?, ?)",
+            (a["steam_appid"], a["game_name"], price)
+        )
         if price <= a["target_price"]:
             db.execute(
                 "UPDATE price_alerts SET triggered = 1, triggered_at = CURRENT_TIMESTAMP WHERE id = ?",

@@ -737,6 +737,38 @@ def delete_alert(appid: int, user=Depends(require_auth)):
     return {"ok": True}
 
 
+@app.get("/api/games/{appid}/price-history")
+async def price_history(appid: int, user=Depends(require_auth)):
+    db = get_db()
+    entry = db.execute(
+        "SELECT game_name FROM game_entries WHERE user_id=? AND steam_appid=? AND status='wishlist'",
+        (user["id"], appid)
+    ).fetchone()
+    db.close()
+    if not entry:
+        raise HTTPException(403, "Solo disponible para juegos en tu Wishlist")
+
+    game_name = dict(entry)["game_name"]
+    from alerts import get_price
+    current = await get_price(appid)
+    if current is not None:
+        db = get_db()
+        db.execute(
+            "INSERT INTO price_history (steam_appid, game_name, price_eur) VALUES (?, ?, ?)",
+            (appid, game_name, current)
+        )
+        db.commit(); db.close()
+
+    db = get_db()
+    limit = 90 if user.get("is_premium") else 3
+    rows = db.execute(
+        "SELECT price_eur, checked_at FROM price_history WHERE steam_appid=? ORDER BY checked_at ASC LIMIT ?",
+        (appid, limit)
+    ).fetchall()
+    db.close()
+    return {"history": [dict(r) for r in rows], "is_premium": bool(user.get("is_premium"))}
+
+
 # ── Google OAuth ──────────────────────────────────────
 @app.get("/api/auth/google")
 async def google_login():

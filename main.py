@@ -1327,7 +1327,7 @@ _CURATED_CATEGORIES = [
     {"name": "Fantasía",          "key": "fantasy",                "emoji": "🧝",  "spy_type": "tag",   "spy_slug": "Fantasy"},
     {"name": "Sigilo",            "key": "stealth",                "emoji": "🕵️",  "spy_type": "tag",   "spy_slug": "Stealth"},
     {"name": "Metroidvania",      "key": "metroidvania",           "emoji": "🗡️",  "spy_type": "tag",   "spy_slug": "Metroidvania"},
-    {"name": "Acceso Anticipado", "key": "early-access",           "emoji": "🚧",  "spy_type": "tag",   "spy_slug": "Early Access"},
+    {"name": "Acceso Anticipado", "key": "early-access",           "emoji": "🚧",  "spy_type": "genre", "spy_slug": "Early Access"},
 ]
 
 async def get_category_list() -> list:
@@ -1418,7 +1418,6 @@ async def genre_community_ranking(genre_key: str):
     steam_appids = list({g["id"] for page_data in pages_data for g in page_data.get("results", [])})
 
     if not steam_appids:
-        cache_set(cache_key, [], ttl_hours=6)
         return []
 
     # Query community ratings for those appids
@@ -1436,7 +1435,8 @@ async def genre_community_ranking(genre_key: str):
     db.close()
 
     result = [dict(r) for r in rows]
-    cache_set(cache_key, result, ttl_hours=6)
+    if result:
+        cache_set(cache_key, result, ttl_hours=6)
     return result
 
 

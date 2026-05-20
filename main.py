@@ -1492,23 +1492,13 @@ async def genre_community_ranking(genre_key: str):
     rawg_type = genre_info.get("rawg_type", "genres")
     rawg_slug = genre_info.get("rawg_slug", genre_key.lower())
 
-    # Fetch 3 pages in parallel (ordered by popularity) to get ~120 candidates
+    # Fetch 5 pages using same criteria as the listing tab (already cached)
     pages_data = await asyncio.gather(*[
-        get(f"{RAWG}/games", {
-            "key": RAWG_KEY, rawg_type: rawg_slug,
-            "page": p, "page_size": 40,
-            "ordering": "-added", "platforms": 4,
-        }) for p in range(1, 4)
+        rawg_games_page(rawg_type, rawg_slug, p, f"genre_detail:{genre_key}:{p}")
+        for p in range(1, 6)
     ])
 
-    rawg_ids = []
-    for page_data in pages_data:
-        rawg_ids.extend([g["id"] for g in page_data.get("results", [])
-                         if not any(t["slug"] in _NSFW_TAGS for t in g.get("tags", []))])
-
-    # Resolve RAWG IDs to Steam appids (uses existing cache)
-    appids_raw = await asyncio.gather(*[resolve_steam_appid(rid) for rid in rawg_ids])
-    steam_appids = [a for a in appids_raw if a]
+    steam_appids = list({g["id"] for page_data in pages_data for g in page_data.get("results", [])})
 
     if not steam_appids:
         cache_set(cache_key, [], ttl_hours=6)

@@ -70,6 +70,7 @@ async def lifespan(app: FastAPI):
     asyncio.create_task(alert_loop())
     asyncio.create_task(wishlist_price_loop())
     asyncio.create_task(steam_autosync_loop())
+    asyncio.create_task(_genres_backfill_loop())
     yield
 
 
@@ -1331,6 +1332,42 @@ async def wishlist_price_loop():
             await check_wishlist_prices()
         except Exception as e:
             print(f"[prices] error: {e}")
+        await asyncio.sleep(3600 * 24)
+
+
+async def _genres_backfill_loop():
+    await asyncio.sleep(90)
+    while True:
+        try:
+            db = get_db()
+            rows = db.execute(
+                "SELECT DISTINCT steam_appid FROM game_entries WHERE genres IS NULL OR genres='[]' OR genres=''"
+            ).fetchall()
+            db.close()
+            appids = [r["steam_appid"] for r in rows]
+            if appids:
+                print(f"[genres-backfill] enriching {len(appids)} entries...")
+                async def _fetch(appid):
+                    try:
+                        data = await get(f"{STEAM}/appdetails", {"appids": appid, "l": "english", "cc": "es"})
+                        entry = data.get(str(appid), {})
+                        if entry.get("success"):
+                            return appid, [x["description"] for x in entry["data"].get("genres", [])]
+                    except Exception:
+                        pass
+                    return appid, []
+                results = await asyncio.gather(*[_fetch(a) for a in appids[:100]])
+                db = get_db()
+                for appid, genres in results:
+                    if genres:
+                        db.execute(
+                            "UPDATE game_entries SET genres=? WHERE steam_appid=? AND (genres IS NULL OR genres='[]' OR genres='')",
+                            (json.dumps(genres), appid)
+                        )
+                db.commit()
+                db.close()
+        except Exception as e:
+            print(f"[genres-backfill] error: {e}")
         await asyncio.sleep(3600 * 24)
 
 

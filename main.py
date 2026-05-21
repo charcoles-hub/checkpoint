@@ -184,6 +184,15 @@ async def _fetch_genres_and_tags(appid: int) -> list[str]:
         cache_set(cache_key, genres, ttl_hours=24 * 7)
     return genres
 
+async def _warm_genres_bg(appids: list):
+    for appid in appids:
+        try:
+            await _fetch_genres_and_tags(appid)
+            await asyncio.sleep(1)
+        except Exception:
+            pass
+
+
 async def _get_spy_list(spy_type: str, spy_slug: str) -> list:
     """Fetch + filter + cache the full game list for a SteamSpy genre/tag."""
     list_key = f"spy_list:{spy_type}:{spy_slug}"
@@ -194,23 +203,35 @@ async def _get_spy_list(spy_type: str, spy_slug: str) -> list:
         data = await get(STEAMSPY, {"request": spy_type, spy_type: spy_slug})
         candidates = [g for g in data.values() if g.get("appid")]
         if spy_type == "tag":
-            candidates = candidates[:200]  # cap before spawning async tasks to stay within memory limits
-            sem = asyncio.Semaphore(20)
-            async def has_tag(g):
-                async with sem:
-                    try:
-                        genres = await _fetch_genres_and_tags(g["appid"])
-                        return spy_slug in genres
-                    except Exception:
-                        return True
-            flags = await asyncio.gather(*[has_tag(g) for g in candidates])
-            candidates = [g for g, ok in zip(candidates, flags) if ok]
+            top = candidates[:300]
+            # One batch DB query for all cached genres — no HTTP calls, no OOM
+            db = get_db()
+            keys = [f"game_genres_tags:{g['appid']}" for g in top]
+            placeholders = ",".join("?" * len(keys))
+            rows = db.execute(
+                f"SELECT key, data FROM api_cache WHERE key IN ({placeholders}) AND expires_at > CURRENT_TIMESTAMP",
+                keys
+            ).fetchall()
+            db.close()
+            genres_map = {r["key"].split(":", 1)[1]: json.loads(r["data"]) for r in rows}
+            filtered, uncached = [], []
+            for g in top:
+                aid = str(g["appid"])
+                if aid in genres_map:
+                    if spy_slug in genres_map[aid]:
+                        filtered.append(g)
+                else:
+                    filtered.append(g)  # unknown: include for now
+                    uncached.append(g["appid"])
+            candidates = filtered
+            if uncached:
+                asyncio.create_task(_warm_genres_bg(uncached[:30]))
         all_games = [
             {"id": g["appid"], "name": g["name"], "image": img(g["appid"]),
              "playtime": round(g.get("average_forever", 0) / 60, 1), "price": None}
             for g in candidates
         ]
-        cache_set(list_key, all_games, ttl_hours=24)
+        cache_set(list_key, all_games, ttl_hours=6)
         return all_games
     except Exception:
         return []

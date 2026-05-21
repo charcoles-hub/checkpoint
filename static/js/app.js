@@ -1638,13 +1638,11 @@ async function loadCommunity() {
   communityLoaded = false;
   const searchInput = document.getElementById('community-search-input');
   const resultsEl = document.getElementById('community-search-results');
-  const listEl = document.getElementById('community-following-list');
-  const feedEl = document.getElementById('community-feed');
+  const feedEl = document.getElementById('community-popular-feed');
 
-  listEl.innerHTML = '';
   feedEl.innerHTML = '';
 
-  // User search
+  // Search bar (clone to remove stale listeners)
   let searchTO = null;
   const freshInput = searchInput.cloneNode(true);
   searchInput.parentNode.replaceChild(freshInput, searchInput);
@@ -1684,7 +1682,6 @@ async function loadCommunity() {
                 btn.classList.add('following'); btn.textContent = t('following.btn_following');
                 showToast(t('toast.follow', {u: u.username}));
               }
-              communityLoaded = false;
             } catch (err) { if (err.status === 401) AUTH.showModal('login'); }
           });
         }
@@ -1699,45 +1696,24 @@ async function loadCommunity() {
     }, 300);
   });
 
-  if (!AUTH.user) return;
   if (communityLoaded) return;
   communityLoaded = true;
 
-  listEl.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
-  const { following, feed } = await AUTH.apiFetch('/api/following');
-
-  if (!following.length) {
-    listEl.innerHTML = `<p style="color:var(--muted);margin:16px 0">${t('following.empty')}</p>`;
-  } else {
-    listEl.innerHTML = `<h4 style="margin:24px 0 12px;color:var(--muted2);font-size:0.9rem;text-transform:uppercase;letter-spacing:.05em">${t('following.title')}</h4>`;
-    following.forEach(u => {
-      const row = document.createElement('div');
-      row.className = 'user-row';
-      row.innerHTML = `
-        <div class="user-avatar-sm">${u.username[0].toUpperCase()}</div>
-        <span class="user-row-name">${u.username}</span>
-        <button class="btn-follow following" data-username="${u.username}">${t('following.btn_following')}</button>
-      `;
-      row.querySelector('.user-avatar-sm').addEventListener('click', () => {
-        history.pushState({}, '', `/u/${u.username}`); showView('profile'); loadProfile(u.username);
-      });
-      row.querySelector('.user-row-name').addEventListener('click', () => {
-        history.pushState({}, '', `/u/${u.username}`); showView('profile'); loadProfile(u.username);
-      });
-      row.querySelector('.btn-follow').addEventListener('click', async () => {
-        await AUTH.apiFetch(`/api/follow/${u.username}`, { method: 'DELETE' });
-        row.remove(); communityLoaded = false;
-        showToast(t('toast.unfollow', {u: u.username}));
-      });
-      listEl.appendChild(row);
-    });
-  }
-
-  if (!feed.length) {
-    feedEl.innerHTML = `<p style="color:var(--muted);margin-top:16px">${t('following.feed_empty')}</p>`;
-  } else {
-    feedEl.innerHTML = `<h4 style="margin:24px 0 12px;color:var(--muted2);font-size:0.9rem;text-transform:uppercase;letter-spacing:.05em">${t('following.activity')}</h4>`;
-    feed.forEach(e => feedEl.appendChild(renderFeedItem(e)));
+  feedEl.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const items = await AUTH.apiFetch('/api/community/popular');
+    feedEl.innerHTML = '';
+    if (!items.length) {
+      feedEl.innerHTML = `<p style="color:var(--muted);margin-top:16px">${t('community.popular_empty')}</p>`;
+      return;
+    }
+    const title = document.createElement('h4');
+    title.style.cssText = 'margin:0 0 16px;color:var(--muted2);font-size:0.9rem;text-transform:uppercase;letter-spacing:.05em';
+    title.textContent = t('community.popular_title');
+    feedEl.appendChild(title);
+    items.forEach(e => feedEl.appendChild(renderFeedItem(e)));
+  } catch {
+    feedEl.innerHTML = `<p style="color:var(--muted);margin-top:16px">${t('community.popular_empty')}</p>`;
   }
 }
 

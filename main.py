@@ -194,6 +194,7 @@ async def _get_spy_list(spy_type: str, spy_slug: str) -> list:
         data = await get(STEAMSPY, {"request": spy_type, spy_type: spy_slug})
         candidates = [g for g in data.values() if g.get("appid")]
         if spy_type == "tag":
+            candidates = candidates[:200]  # cap before spawning async tasks to stay within memory limits
             sem = asyncio.Semaphore(20)
             async def has_tag(g):
                 async with sem:

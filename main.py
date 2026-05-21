@@ -643,6 +643,50 @@ def global_activity():
     return [dict(r) for r in rows]
 
 
+# ── Community popular feed ─────────────────────────────
+@app.get("/api/community/popular")
+def community_popular():
+    from database import DATABASE_URL
+    db = get_db()
+    if DATABASE_URL:  # PostgreSQL: DISTINCT ON picks latest entry per user
+        rows = db.execute("""
+            SELECT * FROM (
+                SELECT DISTINCT ON (ge.user_id)
+                    ge.steam_appid, ge.game_name, ge.game_image,
+                    ge.status, ge.rating, ge.review, ge.notes,
+                    COALESCE(ge.rated_at, ge.added_at) as added_at,
+                    u.username as player,
+                    u.avatar_color, u.avatar_icon, u.avatar_b64,
+                    u.is_premium,
+                    (SELECT COUNT(*) FROM follows WHERE following_id = u.id) as followers_count
+                FROM game_entries ge
+                JOIN users u ON u.id = ge.user_id
+                WHERE ge.rating IS NOT NULL AND ge.status NOT IN ('library', 'wishlist')
+                ORDER BY ge.user_id, COALESCE(ge.rated_at, ge.added_at) DESC
+            ) sub
+            ORDER BY followers_count DESC, added_at DESC
+            LIMIT 20
+        """).fetchall()
+    else:  # SQLite: GROUP BY user_id, MAX picks the row with latest date
+        rows = db.execute("""
+            SELECT ge.steam_appid, ge.game_name, ge.game_image,
+                   ge.status, ge.rating, ge.review, ge.notes,
+                   MAX(ge.added_at) as added_at,
+                   u.username as player,
+                   u.avatar_color, u.avatar_icon, u.avatar_b64,
+                   u.is_premium,
+                   (SELECT COUNT(*) FROM follows WHERE following_id = u.id) as followers_count
+            FROM game_entries ge
+            JOIN users u ON u.id = ge.user_id
+            WHERE ge.rating IS NOT NULL AND ge.status NOT IN ('library', 'wishlist')
+            GROUP BY ge.user_id
+            ORDER BY followers_count DESC, added_at DESC
+            LIMIT 20
+        """).fetchall()
+    db.close()
+    return [dict(r) for r in rows]
+
+
 # ── Admin cache clear ────────────────────────────────
 @app.get("/api/admin/clear-cache")
 def clear_cache():

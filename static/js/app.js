@@ -2324,7 +2324,8 @@ function endTour() {
   if (_tourEl) {
     _tourEl.style.opacity = '0';
     _tourEl.style.transition = 'opacity 0.3s';
-    setTimeout(() => _tourEl?.remove(), 300);
+    const el = _tourEl;
     _tourEl = null;
+    setTimeout(() => el.remove(), 300);
   }
 }

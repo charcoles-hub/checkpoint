@@ -184,6 +184,17 @@ async def _fetch_genres_and_tags(appid: int) -> list[str]:
         cache_set(cache_key, genres, ttl_hours=24 * 7)
     return genres
 
+def _tag_is_relevant(game: dict, tag: str, min_votes: int = 50, min_ratio: float = 0.15) -> bool:
+    tags = game.get("tags")
+    if not isinstance(tags, dict) or not tags:
+        return True  # sin datos de tags, no filtrar
+    votes = tags.get(tag, 0)
+    if votes < min_votes:
+        return False
+    max_votes = max(tags.values(), default=1)
+    return (votes / max_votes) >= min_ratio
+
+
 async def steamspy_games_page(spy_type: str, spy_slug: str, page: int, cache_key: str):
     """Página de juegos de SteamSpy por género/tag. Cacheado 24h en DB."""
     cached = cache_get(cache_key)
@@ -197,7 +208,8 @@ async def steamspy_games_page(spy_type: str, spy_slug: str, page: int, cache_key
             all_games = [
                 {"id": g["appid"], "name": g["name"], "image": img(g["appid"]),
                  "playtime": round(g.get("average_forever", 0) / 60, 1), "price": None}
-                for g in data.values() if g.get("appid")
+                for g in data.values()
+                if g.get("appid") and (spy_type != "tag" or _tag_is_relevant(g, spy_slug))
             ]
             cache_set(list_key, all_games, ttl_hours=24)
         except Exception:
@@ -1476,7 +1488,8 @@ async def genres_previews():
                 all_games = [
                     {"id": g["appid"], "name": g["name"], "image": img(g["appid"]),
                      "playtime": round(g.get("average_forever", 0) / 60, 1), "price": None}
-                    for g in data.values() if g.get("appid")
+                    for g in data.values()
+                    if g.get("appid") and (spy_type != "tag" or _tag_is_relevant(g, spy_slug))
                 ]
                 cache_set(list_key, all_games, ttl_hours=24)
             out = {

@@ -671,7 +671,7 @@ def community_popular():
         rows = db.execute("""
             SELECT ge.steam_appid, ge.game_name, ge.game_image,
                    ge.status, ge.rating, ge.review, ge.notes,
-                   MAX(ge.added_at) as added_at,
+                   MAX(COALESCE(ge.rated_at, ge.added_at)) as added_at,
                    u.username as player,
                    u.avatar_color, u.avatar_icon, u.avatar_b64,
                    u.is_premium,

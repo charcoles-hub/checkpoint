@@ -2029,7 +2029,7 @@ document.getElementById('premium-close').addEventListener('click', closePremiumM
 premiumOverlay.addEventListener('click', e => { if (e.target === premiumOverlay) closePremiumModal(); });
 
 document.getElementById('btn-premium-menu').addEventListener('click', () => {
-  document.getElementById('user-dropdown').classList.remove('open');
+  document.getElementById('user-dropdown')?.classList.remove('open');
   if (AUTH.user?.is_premium) {
     // Open billing portal to manage subscription
     AUTH.apiFetch('/api/billing/portal', { method: 'POST' })

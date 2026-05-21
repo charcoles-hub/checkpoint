@@ -1415,66 +1415,25 @@ async function loadHomeFeed() {
   } catch { feedEl.innerHTML = ''; }
 }
 
-// ── Following section ─────────────────────────────────
+// ── Following view ────────────────────────────────────
 let followingLoaded = false;
 
-async function loadFollowingSection() {
-  if (followingLoaded) return;
-  followingLoaded = true;
-
+async function loadFollowing() {
+  const searchInput = document.getElementById('following-search-input');
+  const resultsEl = document.getElementById('following-search-results');
   const listEl = document.getElementById('following-list');
   const feedEl = document.getElementById('following-feed');
-  listEl.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
 
-  const { following, feed } = await AUTH.apiFetch('/api/following');
+  listEl.innerHTML = '';
+  feedEl.innerHTML = '';
 
-  // Render followed users
-  if (!following.length) {
-    listEl.innerHTML = `<p style="color:var(--muted);margin-bottom:24px">${t('following.empty')}</p>`;
-  } else {
-    listEl.innerHTML = `<h4 style="margin-bottom:12px;color:var(--muted2);font-size:0.9rem;text-transform:uppercase;letter-spacing:.05em">${t('following.title')}</h4>`;
-    following.forEach(u => {
-      const row = document.createElement('div');
-      row.className = 'user-row';
-      row.innerHTML = `
-        <div class="user-avatar-sm">${u.username[0].toUpperCase()}</div>
-        <span class="user-row-name">${u.username}</span>
-        <button class="btn-follow following" data-username="${u.username}">${t('following.btn_following')}</button>
-      `;
-      row.querySelector('.user-avatar-sm').addEventListener('click', () => {
-        history.pushState({}, '', `/u/${u.username}`); showView('profile'); loadProfile(u.username);
-      });
-      row.querySelector('span').addEventListener('click', () => {
-        history.pushState({}, '', `/u/${u.username}`); showView('profile'); loadProfile(u.username);
-      });
-      row.querySelector('.btn-follow').addEventListener('click', async (e) => {
-        if (!AUTH.user) { AUTH.showModal('login'); return; }
-        try {
-          await AUTH.apiFetch(`/api/follow/${u.username}`, { method: 'DELETE' });
-          row.remove();
-          showToast(t('toast.unfollow', {u: u.username}));
-          followingLoaded = false;
-        } catch (err) { if (err.status === 401) AUTH.showModal('login'); }
-      });
-      listEl.appendChild(row);
-    });
-  }
-
-  // Render activity feed
-  if (!feed.length) {
-    feedEl.innerHTML = `<p style="color:var(--muted)">${t('following.feed_empty')}</p>`;
-  } else {
-    feedEl.innerHTML = `<h4 style="margin:24px 0 12px;color:var(--muted2);font-size:0.9rem;text-transform:uppercase;letter-spacing:.05em">${t('following.activity')}</h4>`;
-    feed.forEach(e => feedEl.appendChild(renderFeedItem(e)));
-  }
-
-  // User search
-  const searchInput = document.getElementById('user-search-input');
-  const resultsEl = document.getElementById('user-search-results');
+  // Search bar (clone to remove stale listeners)
   let searchTO = null;
-  searchInput.addEventListener('input', () => {
+  const freshInput = searchInput.cloneNode(true);
+  searchInput.parentNode.replaceChild(freshInput, searchInput);
+  freshInput.addEventListener('input', () => {
     clearTimeout(searchTO);
-    const q = searchInput.value.trim();
+    const q = freshInput.value.trim();
     if (!q) { resultsEl.innerHTML = ''; return; }
     searchTO = setTimeout(async () => {
       const users = await AUTH.apiFetch(`/api/users/search?q=${encodeURIComponent(q)}`);
@@ -1487,35 +1446,85 @@ async function loadFollowingSection() {
           <div class="user-avatar-sm" style="background:${avatarBg(u)}">${avatarContent(u, '1rem')}</div>
           <div style="flex:1">
             <span class="user-row-name">${u.username}</span>
+            ${u.is_premium ? '<span class="premium-badge" style="font-size:0.8rem">⭐</span>' : ''}
             <span style="color:var(--muted);font-size:0.8rem;margin-left:8px">${t('following.games', {n: u.total_games})}</span>
           </div>
-          <button class="btn-follow ${u.is_following ? 'following' : ''}" data-username="${u.username}">
+          ${AUTH.user ? `<button class="btn-follow ${u.is_following ? 'following' : ''}" data-username="${u.username}">
             ${u.is_following ? t('following.btn_following') : t('following.btn_follow')}
-          </button>
+          </button>` : ''}
         `;
         const btn = row.querySelector('.btn-follow');
-        btn.addEventListener('click', async () => {
-          if (!AUTH.user) { AUTH.showModal('login'); return; }
-          try {
-          if (btn.classList.contains('following')) {
-            await AUTH.apiFetch(`/api/follow/${u.username}`, { method: 'DELETE' });
-            btn.classList.remove('following'); btn.textContent = t('following.btn_follow');
-            showToast(t('toast.unfollow', {u: u.username}));
-          } else {
-            await AUTH.apiFetch(`/api/follow/${u.username}`, { method: 'POST' });
-            btn.classList.add('following'); btn.textContent = t('following.btn_following');
-            showToast(t('toast.follow', {u: u.username}));
-          }
-          } catch (err) { if (err.status === 401) AUTH.showModal('login'); }
-          followingLoaded = false;
-        });
+        if (btn) {
+          btn.addEventListener('click', async () => {
+            if (!AUTH.user) { AUTH.showModal('login'); return; }
+            try {
+              if (btn.classList.contains('following')) {
+                await AUTH.apiFetch(`/api/follow/${u.username}`, { method: 'DELETE' });
+                btn.classList.remove('following'); btn.textContent = t('following.btn_follow');
+                showToast(t('toast.unfollow', {u: u.username}));
+              } else {
+                await AUTH.apiFetch(`/api/follow/${u.username}`, { method: 'POST' });
+                btn.classList.add('following'); btn.textContent = t('following.btn_following');
+                showToast(t('toast.follow', {u: u.username}));
+              }
+              followingLoaded = false;
+            } catch (err) { if (err.status === 401) AUTH.showModal('login'); }
+          });
+        }
         row.querySelector('.user-avatar-sm').addEventListener('click', () => {
+          history.pushState({}, '', `/u/${u.username}`); showView('profile'); loadProfile(u.username);
+        });
+        row.querySelector('.user-row-name').addEventListener('click', () => {
           history.pushState({}, '', `/u/${u.username}`); showView('profile'); loadProfile(u.username);
         });
         resultsEl.appendChild(row);
       });
-    }, 350);
+    }, 300);
   });
+
+  if (!AUTH.user) {
+    listEl.innerHTML = `<p style="color:var(--muted);margin:24px 0">${t('following.login_prompt')}</p>`;
+    return;
+  }
+  if (followingLoaded) return;
+  followingLoaded = true;
+
+  listEl.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  const { following, feed } = await AUTH.apiFetch('/api/following');
+
+  if (!following.length) {
+    listEl.innerHTML = `<p style="color:var(--muted);margin:16px 0">${t('following.empty')}</p>`;
+  } else {
+    listEl.innerHTML = `<h4 style="margin:24px 0 12px;color:var(--muted2);font-size:0.9rem;text-transform:uppercase;letter-spacing:.05em">${t('following.title')}</h4>`;
+    following.forEach(u => {
+      const row = document.createElement('div');
+      row.className = 'user-row';
+      row.innerHTML = `
+        <div class="user-avatar-sm" style="background:${avatarBg(u)}">${avatarContent(u, '1rem')}</div>
+        <span class="user-row-name">${u.username}</span>
+        <button class="btn-follow following" data-username="${u.username}">${t('following.btn_following')}</button>
+      `;
+      row.querySelector('.user-avatar-sm').addEventListener('click', () => {
+        history.pushState({}, '', `/u/${u.username}`); showView('profile'); loadProfile(u.username);
+      });
+      row.querySelector('.user-row-name').addEventListener('click', () => {
+        history.pushState({}, '', `/u/${u.username}`); showView('profile'); loadProfile(u.username);
+      });
+      row.querySelector('.btn-follow').addEventListener('click', async () => {
+        await AUTH.apiFetch(`/api/follow/${u.username}`, { method: 'DELETE' });
+        row.remove(); followingLoaded = false;
+        showToast(t('toast.unfollow', {u: u.username}));
+      });
+      listEl.appendChild(row);
+    });
+  }
+
+  if (!feed.length) {
+    feedEl.innerHTML = `<p style="color:var(--muted);margin-top:16px">${t('following.feed_empty')}</p>`;
+  } else {
+    feedEl.innerHTML = `<h4 style="margin:24px 0 12px;color:var(--muted2);font-size:0.9rem;text-transform:uppercase;letter-spacing:.05em">${t('following.activity')}</h4>`;
+    feed.forEach(e => feedEl.appendChild(renderFeedItem(e)));
+  }
 }
 
 function timeAgo(dateStr) {

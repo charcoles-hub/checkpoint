@@ -1424,9 +1424,6 @@ async function loadFollowing() {
   const listEl = document.getElementById('following-list');
   const feedEl = document.getElementById('following-feed');
 
-  listEl.innerHTML = '';
-  feedEl.innerHTML = '';
-
   // Search bar (clone to remove stale listeners)
   let searchTO = null;
   const freshInput = searchInput.cloneNode(true);
@@ -1489,6 +1486,8 @@ async function loadFollowing() {
   if (followingLoaded) return;
   followingLoaded = true;
 
+  listEl.innerHTML = '';
+  feedEl.innerHTML = '';
   listEl.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
   const { following, feed } = await AUTH.apiFetch('/api/following');
 
@@ -1644,7 +1643,6 @@ async function loadProfile(username) {
 let communityLoaded = false;
 
 async function loadCommunity() {
-  communityLoaded = false;
   const searchInput = document.getElementById('community-search-input');
   const resultsEl = document.getElementById('community-search-results');
   const feedEl = document.getElementById('community-popular-feed');
@@ -1691,6 +1689,7 @@ async function loadCommunity() {
                 btn.classList.add('following'); btn.textContent = t('following.btn_following');
                 showToast(t('toast.follow', {u: u.username}));
               }
+              followingLoaded = false;
             } catch (err) { if (err.status === 401) AUTH.showModal('login'); }
           });
         }

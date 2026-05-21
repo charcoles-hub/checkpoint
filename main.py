@@ -667,19 +667,26 @@ def community_popular():
             ORDER BY followers_count DESC, added_at DESC
             LIMIT 20
         """).fetchall()
-    else:  # SQLite: GROUP BY user_id, MAX picks the row with latest date
+    else:  # SQLite: correlated subquery selects the correct row per user
         rows = db.execute("""
             SELECT ge.steam_appid, ge.game_name, ge.game_image,
                    ge.status, ge.rating, ge.review, ge.notes,
-                   MAX(COALESCE(ge.rated_at, ge.added_at)) as added_at,
+                   COALESCE(ge.rated_at, ge.added_at) as added_at,
                    u.username as player,
                    u.avatar_color, u.avatar_icon, u.avatar_b64,
                    u.is_premium,
                    (SELECT COUNT(*) FROM follows WHERE following_id = u.id) as followers_count
             FROM game_entries ge
             JOIN users u ON u.id = ge.user_id
-            WHERE ge.rating IS NOT NULL AND ge.status NOT IN ('library', 'wishlist')
-            GROUP BY ge.user_id
+            WHERE ge.rating IS NOT NULL
+              AND ge.status NOT IN ('library', 'wishlist')
+              AND COALESCE(ge.rated_at, ge.added_at) = (
+                  SELECT MAX(COALESCE(ge2.rated_at, ge2.added_at))
+                  FROM game_entries ge2
+                  WHERE ge2.user_id = ge.user_id
+                    AND ge2.rating IS NOT NULL
+                    AND ge2.status NOT IN ('library', 'wishlist')
+              )
             ORDER BY followers_count DESC, added_at DESC
             LIMIT 20
         """).fetchall()

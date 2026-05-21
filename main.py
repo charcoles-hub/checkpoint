@@ -1357,7 +1357,7 @@ async def _genres_backfill_loop():
     await asyncio.sleep(90)
     while True:
         try:
-            await _run_genres_backfill(force=False)
+            await _run_genres_backfill(force=True)
         except Exception as e:
             print(f"[genres-backfill] error: {e}")
         await asyncio.sleep(3600 * 24)

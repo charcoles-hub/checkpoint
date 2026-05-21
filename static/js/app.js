@@ -799,15 +799,27 @@ async function openModal(gameId) {
         el.innerHTML = `
           <h4 class="modal-section-title">${t('modal.community_reviews')}</h4>
           ${reviews.map(r => `
-            <div class="community-review-item">
+            <div class="community-review-item" data-username="${escHtml(r.username)}">
               <div class="review-meta">
                 <span class="review-username">${escHtml(r.username)}</span>
                 ${r.rating ? `<span class="game-rating" style="font-size:0.8rem;padding:2px 8px">${r.rating}/10</span>` : ''}
+                ${AUTH.user?.is_admin ? `<button class="admin-review-del" data-username="${escHtml(r.username)}" data-appid="${gameId}" title="Borrar reseña" style="margin-left:auto;background:none;border:none;cursor:pointer;font-size:1rem;color:var(--muted);padding:0 4px">🗑️</button>` : ''}
               </div>
               <p class="review-text">${escHtml(r.review)}</p>
             </div>
           `).join('')}
         `;
+        el.querySelectorAll('.admin-review-del').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const uname = btn.dataset.username;
+            if (!confirm(`¿Borrar la reseña de @${uname}?`)) return;
+            try {
+              await AUTH.apiFetch(`/api/admin/reviews/${encodeURIComponent(uname)}/${btn.dataset.appid}`, { method: 'DELETE' });
+              btn.closest('.community-review-item').remove();
+              showToast('Reseña eliminada');
+            } catch(e) { showToast(e.message || 'Error al eliminar'); }
+          });
+        });
       })
       .catch(() => {});
   } catch {
@@ -1978,6 +1990,7 @@ function renderSuggestionCard(s) {
           <button class="admin-status-btn" data-id="${s.id}" data-status="open">💡</button>
           <button class="admin-status-btn" data-id="${s.id}" data-status="planned">📋</button>
           <button class="admin-status-btn" data-id="${s.id}" data-status="done">✅</button>
+          <button class="admin-delete-btn" data-id="${s.id}" title="Borrar idea">🗑️</button>
         </div>` : ''}
     </div>
   `;
@@ -2001,6 +2014,19 @@ function renderSuggestionCard(s) {
       card.querySelector('.suggestion-status').textContent = statusLabels[s.status];
     });
   });
+
+  const delBtn = card.querySelector('.admin-delete-btn');
+  if (delBtn) {
+    delBtn.addEventListener('click', async () => {
+      if (!confirm(`¿Borrar la idea "${s.title}"?`)) return;
+      try {
+        await AUTH.apiFetch(`/api/admin/suggestions/${s.id}`, { method: 'DELETE' });
+        card.remove();
+        ideasData.suggestions = ideasData.suggestions.filter(x => x.id !== s.id);
+        showToast('Idea eliminada');
+      } catch(e) { showToast(e.message || 'Error al eliminar'); }
+    });
+  }
 
   return card;
 }

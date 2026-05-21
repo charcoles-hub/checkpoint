@@ -525,7 +525,7 @@ def update_settings(body: dict, user=Depends(require_auth)):
     return {"ok": True}
 
 
-def _pub(u): return {"id": u["id"], "username": u["username"], "email": u["email"], "notify_ntfy": u.get("notify_ntfy"), "is_premium": bool(u.get("is_premium", 0)), "steam_id": u.get("steam_id"), "bio": u.get("bio") or "", "username_changed_at": _dt_str(u.get("username_changed_at")), "avatar_color": u.get("avatar_color") or "", "avatar_icon": u.get("avatar_icon") or "", "avatar_b64": u.get("avatar_b64") or "", "last_steam_sync": _dt_str(u.get("last_steam_sync"))}
+def _pub(u): return {"id": u["id"], "username": u["username"], "email": u["email"], "notify_ntfy": u.get("notify_ntfy"), "is_premium": bool(u.get("is_premium", 0)), "is_admin": bool(ADMIN_USERNAME and u.get("username") == ADMIN_USERNAME), "steam_id": u.get("steam_id"), "bio": u.get("bio") or "", "username_changed_at": _dt_str(u.get("username_changed_at")), "avatar_color": u.get("avatar_color") or "", "avatar_icon": u.get("avatar_icon") or "", "avatar_b64": u.get("avatar_b64") or "", "last_steam_sync": _dt_str(u.get("last_steam_sync"))}
 
 
 def _parse_dt(val):
@@ -853,6 +853,29 @@ def update_suggestion(sid: int, body: dict, user=Depends(require_auth)):
         raise HTTPException(400, "Estado inválido")
     db = get_db()
     db.execute("UPDATE suggestions SET status=? WHERE id=?", (status, sid))
+    db.commit(); db.close()
+    return {"ok": True}
+
+
+@app.delete("/api/admin/suggestions/{sid}")
+def admin_delete_suggestion(sid: int, user=Depends(require_auth)):
+    if not ADMIN_USERNAME or user.get("username") != ADMIN_USERNAME:
+        raise HTTPException(403, "No autorizado")
+    db = get_db()
+    db.execute("DELETE FROM suggestions WHERE id=?", (sid,))
+    db.commit(); db.close()
+    return {"ok": True}
+
+
+@app.delete("/api/admin/reviews/{username}/{appid}")
+def admin_delete_review(username: str, appid: int, user=Depends(require_auth)):
+    if not ADMIN_USERNAME or user.get("username") != ADMIN_USERNAME:
+        raise HTTPException(403, "No autorizado")
+    db = get_db()
+    target = db.execute("SELECT id FROM users WHERE username=?", (username,)).fetchone()
+    if not target:
+        db.close(); raise HTTPException(404, "Usuario no encontrado")
+    db.execute("UPDATE game_entries SET review=NULL WHERE user_id=? AND steam_appid=?", (target["id"], appid))
     db.commit(); db.close()
     return {"ok": True}
 

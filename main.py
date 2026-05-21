@@ -1524,6 +1524,7 @@ async def genre_community_ranking(genre_key: str):
 @app.get("/explore/{genre_key}")
 @app.get("/reset-password")
 @app.get("/community")
+@app.get("/seguidos")
 async def spa_fallback():
     return FileResponse("static/index.html")
 

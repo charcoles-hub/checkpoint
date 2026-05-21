@@ -52,7 +52,9 @@ function showView(name) {
     if (el) el.style.display = v === name ? '' : 'none';
   });
   if (PAGE_TOURS[name] && !localStorage.getItem(`ck_tour_${name}_done`)) {
-    setTimeout(() => { if (!_tourEl) startPageTour(name); }, 500);
+    setTimeout(() => {
+      if (!_tourEl && document.getElementById(`view-${name}`)?.style.display !== 'none') startPageTour(name);
+    }, 500);
   }
 }
 

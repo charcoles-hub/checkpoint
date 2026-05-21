@@ -707,6 +707,42 @@ def clear_cache():
     return {"ok": True}
 
 
+@app.post("/api/admin/enrich-genres")
+async def admin_enrich_genres():
+    db = get_db()
+    rows = db.execute(
+        "SELECT DISTINCT steam_appid FROM game_entries WHERE genres IS NULL OR genres='[]' OR genres=''"
+    ).fetchall()
+    db.close()
+    appids = [r["steam_appid"] for r in rows]
+    if not appids:
+        return {"enriched": 0}
+
+    async def fetch_genres(appid):
+        try:
+            data = await get(f"{STEAM}/appdetails", {"appids": appid, "l": "english", "cc": "es"})
+            entry = data.get(str(appid), {})
+            if entry.get("success"):
+                return appid, [x["description"] for x in entry["data"].get("genres", [])]
+        except Exception:
+            pass
+        return appid, []
+
+    results = await asyncio.gather(*[fetch_genres(a) for a in appids[:100]])
+    db = get_db()
+    enriched = 0
+    for appid, genres in results:
+        if genres:
+            db.execute(
+                "UPDATE game_entries SET genres=? WHERE steam_appid=? AND (genres IS NULL OR genres='[]' OR genres='')",
+                (json.dumps(genres), appid)
+            )
+            enriched += 1
+    db.commit()
+    db.close()
+    return {"enriched": enriched, "total": len(appids)}
+
+
 # ── Suggestions (roadmap) ─────────────────────────────
 class SuggestionIn(BaseModel):
     title: str = Field(min_length=5, max_length=100)

@@ -2084,9 +2084,19 @@ const TOUR_STEPS = [
 
 let _tourStep = 0;
 let _tourEl = null;
+let _currentTourSteps = null;  // active step array (set by startTour / startPageTour)
+let _currentTourPage = null;   // view name for page tours, null for home tour
+let _tourIsManual = false;     // true when triggered via footer button (no localStorage write)
 
-function startTour() {
-  if (_tourEl) return; // ya activo
+function startTour(manual = false) {
+  _currentTourSteps = TOUR_STEPS;
+  _currentTourPage = null;
+  _tourIsManual = manual;
+  _startTourEngine();
+}
+
+function _startTourEngine() {
+  if (_tourEl) return;
   _tourStep = 0;
   _tourEl = document.createElement('div');
   _tourEl.id = 'tour-root';
@@ -2123,12 +2133,12 @@ function _tourKeyHandler(e) {
 }
 
 function _tourNext() {
-  if (_tourStep < TOUR_STEPS.length - 1) {
+  if (_tourStep < _currentTourSteps.length - 1) {
     _tourStep++;
     _renderTourStep();
   } else {
     endTour();
-    if (!AUTH.user) AUTH.showModal('register');
+    if (!AUTH.user && !_currentTourPage) AUTH.showModal('register');
   }
 }
 
@@ -2137,20 +2147,24 @@ function _tourPrev() {
 }
 
 function _renderTourStep() {
-  const step = TOUR_STEPS[_tourStep];
-  const isLast = _tourStep === TOUR_STEPS.length - 1;
+  const step = _currentTourSteps[_tourStep];
+  const isLast = _tourStep === _currentTourSteps.length - 1;
   const isFirst = _tourStep === 0;
 
   document.getElementById('tour-title').textContent = step.title;
   document.getElementById('tour-text').textContent = step.text;
-  document.querySelector('.tour-step-info').textContent = `${_tourStep + 1} / ${TOUR_STEPS.length}`;
-  document.getElementById('tour-next').textContent = isLast ? '¡Empezar! 🚀' : 'Siguiente →';
+  document.querySelector('.tour-step-info').textContent = `${_tourStep + 1} / ${_currentTourSteps.length}`;
+  document.getElementById('tour-next').textContent = isLast
+    ? (_currentTourPage ? t('tour.btn_done') : '¡Empezar! 🚀')
+    : 'Siguiente →';
   document.getElementById('tour-back').style.visibility = isFirst ? 'hidden' : '';
 
   // Dots
-  document.querySelector('.tour-dots').innerHTML = TOUR_STEPS.map((_, i) =>
+  document.querySelector('.tour-dots').innerHTML = _currentTourSteps.map((_, i) =>
     `<span class="tour-dot ${i === _tourStep ? 'active' : ''}"></span>`
   ).join('');
+
+  if (step.onEnter) step.onEnter();
 
   const spotlight = document.getElementById('tour-spotlight');
   const popup = document.getElementById('tour-popup');
@@ -2163,7 +2177,12 @@ function _renderTourStep() {
 
   popup.className = '';
   const target = document.querySelector(step.target);
-  if (!target || getComputedStyle(target).display === 'none') { _tourStep++; if (_tourStep < TOUR_STEPS.length) _renderTourStep(); return; }
+  if (!target || getComputedStyle(target).display === 'none') {
+    _tourStep++;
+    if (_tourStep < _currentTourSteps.length) _renderTourStep();
+    else endTour();
+    return;
+  }
 
   // Scroll target into view, then position
   target.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -2196,7 +2215,13 @@ function _renderTourStep() {
 }
 
 function endTour() {
-  localStorage.setItem('ck_tour_done', '1');
+  if (!_tourIsManual) {
+    if (_currentTourPage) {
+      localStorage.setItem(`ck_tour_${_currentTourPage}_done`, '1');
+    } else {
+      localStorage.setItem('ck_tour_done', '1');
+    }
+  }
   document.removeEventListener('keydown', _tourKeyHandler);
   if (_tourEl) {
     _tourEl.style.opacity = '0';

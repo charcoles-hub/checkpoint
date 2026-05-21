@@ -2082,6 +2082,74 @@ const TOUR_STEPS = [
   { target: '#btn-register', get title() { return t('tour.step8.title'); }, get text() { return t('tour.step8.text'); }, pos: 'bottom', cta: true },
 ];
 
+const PAGE_TOURS = {
+  explore: [
+    { target: null,
+      get title() { return t('tour.explore.step0.title'); },
+      get text()  { return t('tour.explore.step0.text'); } },
+    { target: '#explore-content', pos: 'top',
+      get title() { return t('tour.explore.step1.title'); },
+      get text()  { return t('tour.explore.step1.text'); } },
+    { target: '#genre-sort-tabs', pos: 'bottom',
+      onEnter: () => { history.pushState({}, '', '/explore/action'); loadGenreDetail('action'); },
+      get title() { return t('tour.explore.step2.title'); },
+      get text()  { return t('tour.explore.step2.text'); } },
+  ],
+  ranking: [
+    { target: null,
+      get title() { return t('tour.ranking.step0.title'); },
+      get text()  { return t('tour.ranking.step0.text'); } },
+    { target: '#ranking-list', pos: 'top',
+      get title() { return t('tour.ranking.step1.title'); },
+      get text()  { return t('tour.ranking.step1.text'); } },
+    { target: null,
+      get title() { return t('tour.ranking.step2.title'); },
+      get text()  { return t('tour.ranking.step2.text'); } },
+  ],
+  community: [
+    { target: null,
+      get title() { return t('tour.community.step0.title'); },
+      get text()  { return t('tour.community.step0.text'); } },
+    { target: '#community-search-input', pos: 'bottom',
+      get title() { return t('tour.community.step1.title'); },
+      get text()  { return t('tour.community.step1.text'); } },
+    { target: '#community-feed', pos: 'top',
+      get title() { return t('tour.community.step2.title'); },
+      get text()  { return t('tour.community.step2.text'); } },
+  ],
+  ideas: [
+    { target: null,
+      get title() { return t('tour.ideas.step0.title'); },
+      get text()  { return t('tour.ideas.step0.text'); } },
+    { target: '#ideas-list', pos: 'top',
+      get title() { return t('tour.ideas.step1.title'); },
+      get text()  { return t('tour.ideas.step1.text'); } },
+    { target: '#ideas-tabs', pos: 'bottom',
+      get title() { return t('tour.ideas.step2.title'); },
+      get text()  { return t('tour.ideas.step2.text'); } },
+    { target: '#btn-new-idea', pos: 'bottom',
+      get title() { return t('tour.ideas.step3.title'); },
+      get text()  { return t('tour.ideas.step3.text'); } },
+  ],
+  'profile-me': [
+    { target: null,
+      get title() { return t('tour.profile-me.step0.title'); },
+      get text()  { return t('tour.profile-me.step0.text'); } },
+    { target: '#mylist-tabs', pos: 'bottom',
+      get title() { return t('tour.profile-me.step1.title'); },
+      get text()  { return t('tour.profile-me.step1.text'); } },
+    { target: '#profile-me-tabs .list-tab[data-tab="steam"]', pos: 'bottom',
+      get title() { return t('tour.profile-me.step2.title'); },
+      get text()  { return t('tour.profile-me.step2.text'); } },
+    { target: '#profile-me-tabs .list-tab[data-tab="account"]', pos: 'bottom',
+      get title() { return t('tour.profile-me.step3.title'); },
+      get text()  { return t('tour.profile-me.step3.text'); } },
+    { target: '#profile-me-tabs .list-tab[data-tab="wishlist"]', pos: 'bottom',
+      get title() { return t('tour.profile-me.step4.title'); },
+      get text()  { return t('tour.profile-me.step4.text'); } },
+  ],
+};
+
 let _tourStep = 0;
 let _tourEl = null;
 let _currentTourSteps = null;  // active step array (set by startTour / startPageTour)
@@ -2091,6 +2159,20 @@ let _tourIsManual = false;     // true when triggered via footer button (no loca
 function startTour(manual = false) {
   _currentTourSteps = TOUR_STEPS;
   _currentTourPage = null;
+  _tourIsManual = manual;
+  _startTourEngine();
+}
+
+function startPageTour(page, manual = false) {
+  const steps = PAGE_TOURS[page];
+  if (!steps) return;
+  if (_tourEl) {
+    _tourEl.remove();
+    _tourEl = null;
+    document.removeEventListener('keydown', _tourKeyHandler);
+  }
+  _currentTourSteps = steps;
+  _currentTourPage = page;
   _tourIsManual = manual;
   _startTourEngine();
 }

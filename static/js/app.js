@@ -44,7 +44,7 @@ let totalGames = 0;
 let genreCache = null;
 
 // ── Views ────────────────────────────────────────────
-const VIEWS = ['home', 'profile-me', 'ranking', 'profile', 'explore', 'community', 'ideas', 'contacto'];
+const VIEWS = ['home', 'profile-me', 'ranking', 'profile', 'explore', 'community', 'following', 'ideas', 'contacto'];
 
 function showView(name) {
   if (_tourEl) {
@@ -87,6 +87,7 @@ document.getElementById('nav-profile-me').addEventListener('click', () => { hist
 document.getElementById('nav-ranking').addEventListener('click', () => { history.pushState({}, '', '/ranking'); showView('ranking'); loadRanking(); closeMenu(); });
 document.getElementById('nav-explore').addEventListener('click', () => { history.pushState({}, '', '/explore'); showView('explore'); loadExplore(); closeMenu(); });
 document.getElementById('nav-community').addEventListener('click', () => { history.pushState({}, '', '/community'); showView('community'); loadCommunity(); closeMenu(); });
+document.getElementById('nav-following').addEventListener('click', () => { history.pushState({}, '', '/seguidos'); showView('following'); loadFollowing(); closeMenu(); });
 document.getElementById('nav-ideas').addEventListener('click', () => { history.pushState({}, '', '/ideas'); showView('ideas'); loadIdeas(); closeMenu(); });
 document.getElementById('footer-contact').addEventListener('click', () => { history.pushState({}, '', '/contacto'); showView('contacto'); });
 document.getElementById('footer-tour').addEventListener('click', () => {
@@ -163,6 +164,7 @@ function route() {
   }
   else if (path.startsWith('/u/')) { showView('profile'); loadProfile(path.slice(3)); }
   else if (path === '/community') { showView('community'); loadCommunity(); }
+  else if (path === '/seguidos') { showView('following'); loadFollowing(); }
   else if (path === '/ideas') { showView('ideas'); loadIdeas(); }
   else if (path === '/contacto') { showView('contacto'); }
   else { showView('home'); loadGames(); loadHomeFeed(); initGenrePills(); }

@@ -1366,6 +1366,11 @@ async def _genres_backfill_loop():
                         )
                 db.commit()
                 db.close()
+                # Invalidar caché de rankings para que reflejen los géneros nuevos
+                db = get_db()
+                db.execute("DELETE FROM api_cache WHERE key LIKE ?", ('genre_ranking_spy:%',))
+                db.commit()
+                db.close()
         except Exception as e:
             print(f"[genres-backfill] error: {e}")
         await asyncio.sleep(3600 * 24)

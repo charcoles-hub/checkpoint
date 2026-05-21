@@ -51,6 +51,9 @@ function showView(name) {
     const el = document.getElementById(`view-${v}`);
     if (el) el.style.display = v === name ? '' : 'none';
   });
+  if (PAGE_TOURS[name] && !localStorage.getItem(`ck_tour_${name}_done`)) {
+    setTimeout(() => { if (!_tourEl) startPageTour(name); }, 500);
+  }
 }
 
 // ── Nav hamburger ────────────────────────────────────
@@ -80,11 +83,17 @@ document.getElementById('nav-community').addEventListener('click', () => { histo
 document.getElementById('nav-ideas').addEventListener('click', () => { history.pushState({}, '', '/ideas'); showView('ideas'); loadIdeas(); closeMenu(); });
 document.getElementById('footer-contact').addEventListener('click', () => { history.pushState({}, '', '/contacto'); showView('contacto'); });
 document.getElementById('footer-tour').addEventListener('click', () => {
-  localStorage.removeItem('ck_tour_done');
-  if (_tourEl) { _tourEl.remove(); _tourEl = null; document.removeEventListener('keydown', _tourKeyHandler); }
-  history.pushState({}, '', '/');
-  resetHome();
-  startTour();
+  const activeView = [...document.querySelectorAll('[id^="view-"]')]
+    .find(el => el.style.display !== 'none');
+  const page = activeView?.id.replace('view-', '');
+  if (page && PAGE_TOURS[page]) {
+    startPageTour(page, true);
+  } else {
+    if (_tourEl) { _tourEl.remove(); _tourEl = null; document.removeEventListener('keydown', _tourKeyHandler); }
+    history.pushState({}, '', '/');
+    resetHome();
+    startTour(true);
+  }
 });
 
 function resetHome() {

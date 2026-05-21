@@ -47,6 +47,11 @@ let genreCache = null;
 const VIEWS = ['home', 'profile-me', 'ranking', 'profile', 'explore', 'community', 'ideas', 'contacto'];
 
 function showView(name) {
+  if (_tourEl) {
+    document.removeEventListener('keydown', _tourKeyHandler);
+    _tourEl.remove();
+    _tourEl = null;
+  }
   VIEWS.forEach(v => {
     const el = document.getElementById(`view-${v}`);
     if (el) el.style.display = v === name ? '' : 'none';

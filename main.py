@@ -821,7 +821,7 @@ def get_entry(appid: int, user=Depends(require_auth)):
 @app.post("/api/list")
 def add_to_list(body: EntryIn, user=Depends(require_auth)):
     db = get_db()
-    genres_json = json.dumps(body.genres) if body.genres else None
+    genres_json = json.dumps(body.genres) if body.genres is not None else None
     db.execute("""
         INSERT INTO game_entries (user_id, steam_appid, game_name, game_image, status, rating, notes, draft_notes, review, genres, rated_at)
         VALUES (?,?,?,?,?,?,?,?,?,?, CASE WHEN ? IS NOT NULL THEN CURRENT_TIMESTAMP ELSE NULL END)
@@ -1469,32 +1469,15 @@ async def genre_community_ranking(genre_key: str):
     if cached is not None:
         return cached
 
-    list_key = f"spy_list:{spy_type}:{spy_slug}"
-    all_games = cache_get(list_key)
-    if all_games is None:
-        try:
-            data = await get(STEAMSPY, {"request": spy_type, spy_type: spy_slug})
-            all_games = [
-                {"id": g["appid"], "name": g["name"], "image": img(g["appid"]),
-                 "playtime": round(g.get("average_forever", 0) / 60, 1), "price": None}
-                for g in data.values() if g.get("appid")
-            ]
-            cache_set(list_key, all_games, ttl_hours=24)
-        except Exception:
-            return []
-    steam_appids = [g["id"] for g in all_games[:2000]]
-    if not steam_appids:
-        return []
     db = get_db()
-    placeholders = ",".join(["?"] * len(steam_appids))
     rows = db.execute(
-        f"SELECT steam_appid, game_name, game_image, "
-        f"ROUND(AVG(rating),1) as avg_rating, COUNT(*) as votes "
-        f"FROM game_entries "
-        f"WHERE rating IS NOT NULL AND status IN ('played', 'playing') AND steam_appid IN ({placeholders}) "
-        f"GROUP BY steam_appid, game_name, game_image "
-        f"ORDER BY avg_rating DESC, votes DESC",
-        steam_appids
+        "SELECT steam_appid, game_name, game_image, "
+        "ROUND(AVG(rating),1) as avg_rating, COUNT(*) as votes "
+        "FROM game_entries "
+        "WHERE rating IS NOT NULL AND status IN ('played', 'playing') AND genres LIKE ? "
+        "GROUP BY steam_appid, game_name, game_image "
+        "ORDER BY avg_rating DESC, votes DESC",
+        (f'%"{spy_slug}"%',)
     ).fetchall()
     db.close()
 

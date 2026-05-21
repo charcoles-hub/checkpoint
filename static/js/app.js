@@ -614,10 +614,17 @@ async function openModal(gameId) {
       <div class="my-entry-box">
         <div class="my-entry-header">
           <span class="status-badge status-${myEntry.status}">${{played:t('status.played'),playing:t('status.playing'),wishlist:t('status.wishlist'),abandoned:t('status.abandoned'),library:t('status.library')}[myEntry.status]}</span>
-          ${myEntry.rating ? `<span class="game-rating">${myEntry.rating}/10</span>` : ''}
+          ${(myEntry.status !== 'played' && myEntry.status !== 'playing') && myEntry.rating ? `<span class="game-rating">${myEntry.rating}/10</span>` : ''}
           <button class="btn-ghost" id="btn-remove-game" style="margin-left:auto;padding:4px 10px;font-size:0.8rem;color:var(--muted)">${t('modal.btn_remove')}</button>
         </div>
-        ${myEntry.notes ? `<p class="my-entry-notes">"${escHtml(myEntry.notes)}"</p>` : ''}
+        ${(myEntry.status !== 'played' && myEntry.status !== 'playing') && myEntry.notes ? `<p class="my-entry-notes">"${escHtml(myEntry.notes)}"</p>` : ''}
+        ${(myEntry.status === 'played' || myEntry.status === 'playing') ? `
+        <div class="rating-edit-section">
+          <label style="font-size:0.82rem;color:var(--muted);display:block;margin-bottom:6px">${t('modal.rating_label')} <span style="font-size:0.75rem;color:var(--muted)">${t('modal.optional')}</span></label>
+          <div id="my-entry-stars" style="display:flex;gap:2px;margin-bottom:8px"></div>
+          <textarea id="my-entry-notes-input" class="field-input" rows="2" placeholder="${t('modal.rating_placeholder')}" style="resize:vertical;margin-bottom:8px">${escHtml(myEntry.notes || '')}</textarea>
+          <button class="btn-ghost" id="btn-update-rating" style="padding:6px 14px;font-size:0.85rem">${t('modal.btn_save')}</button>
+        </div>` : ''}
         <div class="draft-section">
           <label style="font-size:0.82rem;color:var(--muted);display:block;margin-bottom:6px">${t('modal.draft_label')}</label>
           <textarea id="draft-input" class="field-input" rows="3" placeholder="${t('modal.draft_placeholder')}" style="resize:vertical;margin-bottom:8px">${escHtml(myEntry.draft_notes || '')}</textarea>
@@ -643,16 +650,25 @@ async function openModal(gameId) {
     `;
 
     buildStars('stars-container', 0);
+    if (myEntry && (myEntry.status === 'played' || myEntry.status === 'playing')) {
+      buildStars('my-entry-stars', myEntry.rating || 0);
+    }
+
+    let pendingStatus = 'played';
 
     document.getElementById('modal-btn-played').addEventListener('click', async () => {
       if (!AUTH.user) { AUTH.showModal('login'); return; }
+      pendingStatus = 'played';
       await saveEntry(g, 'played');
       document.getElementById('rating-form').style.display = '';
       document.getElementById('alert-form').style.display = 'none';
     });
     document.getElementById('modal-btn-playing').addEventListener('click', async () => {
       if (!AUTH.user) { AUTH.showModal('login'); return; }
-      await saveEntry(g, 'playing'); showToast(t('toast.playing'));
+      pendingStatus = 'playing';
+      await saveEntry(g, 'playing');
+      document.getElementById('rating-form').style.display = '';
+      document.getElementById('alert-form').style.display = 'none';
     });
     document.getElementById('modal-btn-abandoned').addEventListener('click', async () => {
       if (!AUTH.user) { AUTH.showModal('login'); return; }
@@ -673,7 +689,7 @@ async function openModal(gameId) {
       const rating = parseInt(document.getElementById('stars-container').dataset.value) || null;
       const notes = document.getElementById('review-notes').value.trim() || null;
       await AUTH.apiFetch('/api/list', { method: 'POST', body: JSON.stringify({
-        steam_appid: g.id, game_name: g.name, game_image: g.image, status: 'played', rating, notes, genres: g.genres || []
+        steam_appid: g.id, game_name: g.name, game_image: g.image, status: pendingStatus, rating, notes, genres: g.genres || []
       })});
       document.getElementById('rating-form').style.display = 'none';
       showToast(rating ? t('toast.saved_rating', {n: rating}) : t('toast.saved'));
@@ -708,6 +724,17 @@ async function openModal(gameId) {
       await AUTH.apiFetch(`/api/list/${g.id}`, { method: 'DELETE' });
       closeModal();
       showToast(t('toast.game_removed'));
+      if (document.getElementById('view-profile-me').style.display !== 'none') loadMyList();
+    });
+    document.getElementById('btn-update-rating')?.addEventListener('click', async () => {
+      const rating = parseInt(document.getElementById('my-entry-stars').dataset.value) || null;
+      const notes = document.getElementById('my-entry-notes-input').value.trim() || null;
+      await AUTH.apiFetch('/api/list', { method: 'POST', body: JSON.stringify({
+        steam_appid: g.id, game_name: g.name, game_image: g.image,
+        status: myEntry.status, rating, notes, genres: g.genres || []
+      })});
+      myEntry.rating = rating; myEntry.notes = notes;
+      showToast(rating ? t('toast.saved_rating', {n: rating}) : t('toast.saved'));
       if (document.getElementById('view-profile-me').style.display !== 'none') loadMyList();
     });
     document.getElementById('btn-save-draft')?.addEventListener('click', async () => {

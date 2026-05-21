@@ -592,7 +592,7 @@ async function openModal(gameId) {
         <button class="btn-abandoned" id="modal-btn-abandoned">${t('modal.btn_abandoned')}</button>
       </div>
       <div id="rating-form" style="display:none" class="alert-form-box">
-        <p class="alert-form-label" style="margin-bottom:14px">${t('modal.rating_label')} <span style="color:var(--muted);font-size:0.8rem">${t('modal.optional')}</span></p>
+        <p class="alert-form-label" style="margin-bottom:14px">${t('modal.rating_label')}</p>
         <div id="stars-container" style="margin-bottom:14px;display:flex;gap:2px"></div>
         <textarea id="review-notes" class="field-input" rows="2" placeholder="${t('modal.rating_placeholder')}" style="resize:vertical;margin-bottom:12px"></textarea>
         <div style="display:flex;gap:10px">
@@ -620,7 +620,7 @@ async function openModal(gameId) {
         ${(myEntry.status !== 'played' && myEntry.status !== 'playing') && myEntry.notes ? `<p class="my-entry-notes">"${escHtml(myEntry.notes)}"</p>` : ''}
         ${(myEntry.status === 'played' || myEntry.status === 'playing') ? `
         <div class="rating-edit-section">
-          <label style="font-size:0.82rem;color:var(--muted);display:block;margin-bottom:6px">${t('modal.rating_label')} <span style="font-size:0.75rem;color:var(--muted)">${t('modal.optional')}</span></label>
+          <label style="font-size:0.82rem;color:var(--muted);display:block;margin-bottom:6px">${t('modal.rating_label')}</label>
           <div id="my-entry-stars" style="display:flex;gap:2px;margin-bottom:8px"></div>
           <textarea id="my-entry-notes-input" class="field-input" rows="2" placeholder="${t('modal.rating_placeholder')}" style="resize:vertical;margin-bottom:8px">${escHtml(myEntry.notes || '')}</textarea>
           <button class="btn-ghost" id="btn-update-rating" style="padding:6px 14px;font-size:0.85rem">${t('modal.btn_save')}</button>
@@ -630,15 +630,6 @@ async function openModal(gameId) {
           <textarea id="draft-input" class="field-input" rows="3" placeholder="${t('modal.draft_placeholder')}" style="resize:vertical;margin-bottom:8px">${escHtml(myEntry.draft_notes || '')}</textarea>
           <button class="btn-ghost" id="btn-save-draft" style="padding:6px 14px;font-size:0.85rem">${t('modal.btn_draft')}</button>
         </div>
-        ${(myEntry.status === 'played' || myEntry.status === 'playing') ? `
-        <div class="review-section">
-          <label style="font-size:0.82rem;color:var(--muted);display:block;margin-bottom:6px">${t('modal.review_label')}</label>
-          <textarea id="review-input" class="field-input" rows="4" placeholder="${t('modal.review_placeholder')}" style="resize:vertical;margin-bottom:8px" maxlength="2000">${escHtml(myEntry.review || '')}</textarea>
-          <div style="display:flex;align-items:center;gap:10px">
-            <button class="btn-ghost" id="btn-save-review" style="padding:6px 14px;font-size:0.85rem">${t('modal.btn_review')}</button>
-            <span id="review-chars" style="font-size:0.75rem;color:var(--muted)">${(myEntry.review || '').length}/2000</span>
-          </div>
-        </div>` : ''}
       </div>` : AUTH.user ? `
       <div class="draft-section" style="margin-top:16px">
         <label style="font-size:0.82rem;color:var(--muted);display:block;margin-bottom:6px">${t('modal.draft_label_new')}</label>
@@ -746,15 +737,6 @@ async function openModal(gameId) {
         status, rating: myEntry?.rating || null, notes: myEntry?.notes || null, draft_notes: draft, genres: g.genres || []
       })});
       showToast(t('toast.draft'));
-    });
-    document.getElementById('review-input')?.addEventListener('input', () => {
-      const len = document.getElementById('review-input').value.length;
-      document.getElementById('review-chars').textContent = `${len}/2000`;
-    });
-    document.getElementById('btn-save-review')?.addEventListener('click', async () => {
-      const review = document.getElementById('review-input').value.trim();
-      await AUTH.apiFetch(`/api/list/${g.id}/review`, { method: 'PATCH', body: JSON.stringify({ review }) });
-      showToast(t('toast.review_saved'));
     });
 
     // Price history

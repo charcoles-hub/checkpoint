@@ -735,8 +735,8 @@ def clear_cache():
 
 @app.post("/api/admin/enrich-genres")
 async def admin_enrich_genres(force: bool = False):
-    enriched = await _run_genres_backfill(force=force)
-    return {"enriched": enriched}
+    asyncio.create_task(_run_genres_backfill(force=force))
+    return {"ok": True, "running": "background"}
 
 
 # ── Suggestions (roadmap) ─────────────────────────────

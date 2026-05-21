@@ -1472,7 +1472,7 @@ async def genre_community_ranking(genre_key: str):
     db = get_db()
     rows = db.execute(
         "SELECT steam_appid, game_name, game_image, "
-        "ROUND(AVG(rating),1) as avg_rating, COUNT(*) as votes "
+        "ROUND(AVG(rating::numeric),1)::float as avg_rating, COUNT(*) as votes "
         "FROM game_entries "
         "WHERE rating IS NOT NULL AND status IN ('played', 'playing') AND genres LIKE ? "
         "GROUP BY steam_appid, game_name, game_image "

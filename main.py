@@ -1333,15 +1333,19 @@ async def _run_genres_backfill(force: bool = False):
     if not appids:
         return 0
     print(f"[genres-backfill] enriching {len(appids)} entries (force={force})...")
-    results = await asyncio.gather(*[_fetch_genres_and_tags(a) for a in appids[:200]])
-    db = get_db()
     enriched = 0
-    for appid, genres in zip(appids[:200], results):
-        if genres:
-            db.execute("UPDATE game_entries SET genres=? WHERE steam_appid=?", (json.dumps(genres), appid))
-            enriched += 1
-    db.commit()
-    db.close()
+    batch_size = 10
+    for i in range(0, len(appids), batch_size):
+        batch = appids[i:i + batch_size]
+        results = await asyncio.gather(*[_fetch_genres_and_tags(a) for a in batch])
+        db = get_db()
+        for appid, genres in zip(batch, results):
+            if genres:
+                db.execute("UPDATE game_entries SET genres=? WHERE steam_appid=?", (json.dumps(genres), appid))
+                enriched += 1
+        db.commit()
+        db.close()
+        await asyncio.sleep(0.5)
     db = get_db()
     db.execute("DELETE FROM api_cache WHERE key LIKE ?", ('genre_ranking_spy:%',))
     db.commit()

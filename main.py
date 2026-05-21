@@ -599,8 +599,8 @@ def get_following(user=Depends(require_auth)):
         rows = db.execute(f"""
             SELECT ge.*, u.username as player
             FROM game_entries ge JOIN users u ON u.id = ge.user_id
-            WHERE ge.user_id IN ({placeholders})
-            ORDER BY ge.added_at DESC LIMIT 30
+            WHERE ge.user_id IN ({placeholders}) AND ge.status != 'library'
+            ORDER BY COALESCE(ge.rated_at, ge.added_at) DESC LIMIT 30
         """, ids).fetchall()
         feed = [dict(r) for r in rows]
     db.close()
@@ -616,7 +616,7 @@ def ranking():
                ROUND(AVG(rating), 1) as avg_rating,
                COUNT(*) as votes
         FROM game_entries
-        WHERE rating IS NOT NULL AND status = 'played'
+        WHERE rating IS NOT NULL AND status IN ('played', 'playing')
         GROUP BY steam_appid, game_name, game_image
         ORDER BY avg_rating DESC, votes DESC
         LIMIT 50
@@ -631,12 +631,13 @@ def global_activity():
     db = get_db()
     rows = db.execute("""
         SELECT ge.steam_appid, ge.game_name, ge.game_image,
-               ge.status, ge.rating, ge.review, ge.notes, ge.added_at,
+               ge.status, ge.rating, ge.review, ge.notes,
+               COALESCE(ge.rated_at, ge.added_at) as added_at,
                u.username as player
         FROM game_entries ge
         JOIN users u ON u.id = ge.user_id
-        WHERE ge.rating IS NOT NULL
-        ORDER BY ge.added_at DESC LIMIT 20
+        WHERE ge.rating IS NOT NULL AND ge.status != 'library'
+        ORDER BY COALESCE(ge.rated_at, ge.added_at) DESC LIMIT 20
     """).fetchall()
     db.close()
     return [dict(r) for r in rows]
@@ -771,14 +772,15 @@ def add_to_list(body: EntryIn, user=Depends(require_auth)):
     db = get_db()
     genres_json = json.dumps(body.genres) if body.genres else None
     db.execute("""
-        INSERT INTO game_entries (user_id, steam_appid, game_name, game_image, status, rating, notes, draft_notes, review, genres)
-        VALUES (?,?,?,?,?,?,?,?,?,?)
+        INSERT INTO game_entries (user_id, steam_appid, game_name, game_image, status, rating, notes, draft_notes, review, genres, rated_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?, CASE WHEN ? IS NOT NULL THEN CURRENT_TIMESTAMP ELSE NULL END)
         ON CONFLICT(user_id, steam_appid) DO UPDATE SET
             status=excluded.status, rating=excluded.rating, notes=excluded.notes,
             draft_notes=COALESCE(excluded.draft_notes, game_entries.draft_notes),
             review=COALESCE(excluded.review, game_entries.review),
-            genres=COALESCE(excluded.genres, game_entries.genres)
-    """, (user["id"], body.steam_appid, body.game_name, body.game_image, body.status, body.rating, body.notes, body.draft_notes, body.review, genres_json))
+            genres=COALESCE(excluded.genres, game_entries.genres),
+            rated_at=CASE WHEN excluded.rating IS NOT NULL THEN CURRENT_TIMESTAMP ELSE game_entries.rated_at END
+    """, (user["id"], body.steam_appid, body.game_name, body.game_image, body.status, body.rating, body.notes, body.draft_notes, body.review, genres_json, body.rating))
     db.commit(); db.close()
     return {"ok": True}
 
@@ -788,7 +790,7 @@ def add_to_list(body: EntryIn, user=Depends(require_auth)):
 def save_review(request: Request, appid: int, body: dict, user=Depends(require_auth)):
     review = (body.get("review") or "").strip()[:2000] or None
     db = get_db()
-    db.execute("UPDATE game_entries SET review=? WHERE user_id=? AND steam_appid=?", (review, user["id"], appid))
+    db.execute("UPDATE game_entries SET review=?, rated_at=CURRENT_TIMESTAMP WHERE user_id=? AND steam_appid=?", (review, user["id"], appid))
     db.commit(); db.close()
     return {"ok": True}
 
@@ -797,10 +799,10 @@ def save_review(request: Request, appid: int, body: dict, user=Depends(require_a
 def get_game_reviews(appid: int):
     db = get_db()
     rows = db.execute("""
-        SELECT ge.review, ge.rating, ge.added_at, u.username
+        SELECT ge.review, ge.rating, COALESCE(ge.rated_at, ge.added_at) as added_at, u.username
         FROM game_entries ge JOIN users u ON ge.user_id = u.id
         WHERE ge.steam_appid=? AND ge.review IS NOT NULL AND ge.review != ''
-        ORDER BY ge.added_at DESC LIMIT 20
+        ORDER BY COALESCE(ge.rated_at, ge.added_at) DESC LIMIT 20
     """, (appid,)).fetchall()
     db.close()
     return [dict(r) for r in rows]
@@ -1392,7 +1394,7 @@ async def games_by_genre(genre_key: str, page: int = 1):
     for appid in appids:
         row = db.execute(
             "SELECT ROUND(AVG(rating),1) as avg_rating, COUNT(*) as votes "
-            "FROM game_entries WHERE steam_appid=? AND rating IS NOT NULL AND status='played'",
+            "FROM game_entries WHERE steam_appid=? AND rating IS NOT NULL AND status IN ('played', 'playing')",
             (appid,)
         ).fetchone()
         if row and row["votes"]:
@@ -1425,7 +1427,7 @@ async def genre_community_ranking(genre_key: str):
             "SELECT steam_appid, game_name, game_image, "
             "ROUND(AVG(rating),1) as avg_rating, COUNT(*) as votes "
             "FROM game_entries "
-            "WHERE rating IS NOT NULL AND status='played' AND genres LIKE ? "
+            "WHERE rating IS NOT NULL AND status IN ('played', 'playing') AND genres LIKE ? "
             "GROUP BY steam_appid, game_name, game_image "
             "ORDER BY avg_rating DESC, votes DESC",
             (f'%"{spy_slug}"%',)
@@ -1456,7 +1458,7 @@ async def genre_community_ranking(genre_key: str):
             f"SELECT steam_appid, game_name, game_image, "
             f"ROUND(AVG(rating),1) as avg_rating, COUNT(*) as votes "
             f"FROM game_entries "
-            f"WHERE rating IS NOT NULL AND status='played' AND steam_appid IN ({placeholders}) "
+            f"WHERE rating IS NOT NULL AND status IN ('played', 'playing') AND steam_appid IN ({placeholders}) "
             f"GROUP BY steam_appid, game_name, game_image "
             f"ORDER BY avg_rating DESC, votes DESC",
             steam_appids

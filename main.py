@@ -162,6 +162,28 @@ def cache_set(key: str, data, ttl_hours: float = 24):
     db.commit()
     db.close()
 
+
+async def _fetch_genres_and_tags(appid: int) -> list[str]:
+    """Géneros oficiales Steam + tags SteamSpy combinados. Cacheado 7 días."""
+    cache_key = f"game_genres_tags:{appid}"
+    cached = cache_get(cache_key)
+    if cached is not None:
+        return cached
+    steam_task = get(f"{STEAM}/appdetails", {"appids": appid, "l": "english", "cc": "es"})
+    spy_task = get(STEAMSPY, {"request": "appdetails", "appid": appid})
+    steam_data, spy_data = await asyncio.gather(steam_task, spy_task, return_exceptions=True)
+    genres = []
+    if not isinstance(steam_data, Exception):
+        entry = steam_data.get(str(appid), {})
+        if entry.get("success"):
+            genres = [x["description"] for x in entry["data"].get("genres", [])]
+    if not isinstance(spy_data, Exception):
+        tags = list((spy_data.get("tags") or {}).keys())[:15]
+        genres += [t for t in tags if t not in genres]
+    if genres:
+        cache_set(cache_key, genres, ttl_hours=24 * 7)
+    return genres
+
 async def steamspy_games_page(spy_type: str, spy_slug: str, page: int, cache_key: str):
     """Página de juegos de SteamSpy por género/tag. Cacheado 24h en DB."""
     cached = cache_get(cache_key)
@@ -218,7 +240,10 @@ async def list_games(search: str = "", page: int = 1):
 
 @app.get("/api/games/{game_id}")
 async def game_detail(game_id: int):
-    data = await get(f"{STEAM}/appdetails", {"appids": game_id, "l": "english", "cc": "es"})
+    data, genres = await asyncio.gather(
+        get(f"{STEAM}/appdetails", {"appids": game_id, "l": "english", "cc": "es"}),
+        _fetch_genres_and_tags(game_id),
+    )
     entry = data.get(str(game_id), {})
     if not entry.get("success"):
         raise HTTPException(404, "Juego no encontrado")
@@ -229,7 +254,7 @@ async def game_detail(game_id: int):
         "name": g.get("name"),
         "description": g.get("short_description", ""),
         "image": img(game_id),
-        "genres": [x["description"] for x in g.get("genres", [])],
+        "genres": genres,
         "platforms": [k for k, v in g.get("platforms", {}).items() if v],
         "metacritic": g.get("metacritic", {}).get("score"),
         "release_date": g.get("release_date", {}).get("date"),
@@ -709,39 +734,9 @@ def clear_cache():
 
 
 @app.post("/api/admin/enrich-genres")
-async def admin_enrich_genres():
-    db = get_db()
-    rows = db.execute(
-        "SELECT DISTINCT steam_appid FROM game_entries WHERE genres IS NULL OR genres='[]' OR genres=''"
-    ).fetchall()
-    db.close()
-    appids = [r["steam_appid"] for r in rows]
-    if not appids:
-        return {"enriched": 0}
-
-    async def fetch_genres(appid):
-        try:
-            data = await get(f"{STEAM}/appdetails", {"appids": appid, "l": "english", "cc": "es"})
-            entry = data.get(str(appid), {})
-            if entry.get("success"):
-                return appid, [x["description"] for x in entry["data"].get("genres", [])]
-        except Exception:
-            pass
-        return appid, []
-
-    results = await asyncio.gather(*[fetch_genres(a) for a in appids[:100]])
-    db = get_db()
-    enriched = 0
-    for appid, genres in results:
-        if genres:
-            db.execute(
-                "UPDATE game_entries SET genres=? WHERE steam_appid=? AND (genres IS NULL OR genres='[]' OR genres='')",
-                (json.dumps(genres), appid)
-            )
-            enriched += 1
-    db.commit()
-    db.close()
-    return {"enriched": enriched, "total": len(appids)}
+async def admin_enrich_genres(force: bool = False):
+    enriched = await _run_genres_backfill(force=force)
+    return {"enriched": enriched}
 
 
 # ── Suggestions (roadmap) ─────────────────────────────
@@ -915,21 +910,10 @@ async def enrich_genres(user=Depends(require_auth)):
     appids = [r["steam_appid"] for r in rows]
     if not appids:
         return {"enriched": 0}
-
-    async def fetch_genres(appid):
-        try:
-            data = await get(f"{STEAM}/appdetails", {"appids": appid, "l": "english", "cc": "es"})
-            entry = data.get(str(appid), {})
-            if entry.get("success"):
-                return appid, [x["description"] for x in entry["data"].get("genres", [])]
-        except Exception:
-            pass
-        return appid, []
-
-    results = await asyncio.gather(*[fetch_genres(a) for a in appids[:40]])
+    results = await asyncio.gather(*[_fetch_genres_and_tags(a) for a in appids[:40]])
     db = get_db()
     enriched = 0
-    for appid, genres in results:
+    for appid, genres in zip(appids[:40], results):
         if genres:
             db.execute(
                 "UPDATE game_entries SET genres=? WHERE user_id=? AND steam_appid=?",
@@ -1335,42 +1319,41 @@ async def wishlist_price_loop():
         await asyncio.sleep(3600 * 24)
 
 
+async def _run_genres_backfill(force: bool = False):
+    """Enriquece genres+tags en game_entries. force=True actualiza todos los entries."""
+    db = get_db()
+    if force:
+        rows = db.execute("SELECT DISTINCT steam_appid FROM game_entries").fetchall()
+    else:
+        rows = db.execute(
+            "SELECT DISTINCT steam_appid FROM game_entries WHERE genres IS NULL OR genres='[]' OR genres=''"
+        ).fetchall()
+    db.close()
+    appids = [r["steam_appid"] for r in rows]
+    if not appids:
+        return 0
+    print(f"[genres-backfill] enriching {len(appids)} entries (force={force})...")
+    results = await asyncio.gather(*[_fetch_genres_and_tags(a) for a in appids[:200]])
+    db = get_db()
+    enriched = 0
+    for appid, genres in zip(appids[:200], results):
+        if genres:
+            db.execute("UPDATE game_entries SET genres=? WHERE steam_appid=?", (json.dumps(genres), appid))
+            enriched += 1
+    db.commit()
+    db.close()
+    db = get_db()
+    db.execute("DELETE FROM api_cache WHERE key LIKE ?", ('genre_ranking_spy:%',))
+    db.commit()
+    db.close()
+    return enriched
+
+
 async def _genres_backfill_loop():
     await asyncio.sleep(90)
     while True:
         try:
-            db = get_db()
-            rows = db.execute(
-                "SELECT DISTINCT steam_appid FROM game_entries WHERE genres IS NULL OR genres='[]' OR genres=''"
-            ).fetchall()
-            db.close()
-            appids = [r["steam_appid"] for r in rows]
-            if appids:
-                print(f"[genres-backfill] enriching {len(appids)} entries...")
-                async def _fetch(appid):
-                    try:
-                        data = await get(f"{STEAM}/appdetails", {"appids": appid, "l": "english", "cc": "es"})
-                        entry = data.get(str(appid), {})
-                        if entry.get("success"):
-                            return appid, [x["description"] for x in entry["data"].get("genres", [])]
-                    except Exception:
-                        pass
-                    return appid, []
-                results = await asyncio.gather(*[_fetch(a) for a in appids[:100]])
-                db = get_db()
-                for appid, genres in results:
-                    if genres:
-                        db.execute(
-                            "UPDATE game_entries SET genres=? WHERE steam_appid=? AND (genres IS NULL OR genres='[]' OR genres='')",
-                            (json.dumps(genres), appid)
-                        )
-                db.commit()
-                db.close()
-                # Invalidar caché de rankings para que reflejen los géneros nuevos
-                db = get_db()
-                db.execute("DELETE FROM api_cache WHERE key LIKE ?", ('genre_ranking_spy:%',))
-                db.commit()
-                db.close()
+            await _run_genres_backfill(force=False)
         except Exception as e:
             print(f"[genres-backfill] error: {e}")
         await asyncio.sleep(3600 * 24)

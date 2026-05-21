@@ -26,6 +26,7 @@
       <button class="nl" id="nav-explore" data-i18n="nav.explore">Explorar</button>
       <button class="nl" id="nav-ranking" data-i18n="nav.ranking">Ranking</button>
       <button class="nl" id="nav-community" data-i18n="nav.community">Comunidad</button>
+      <button class="nl" id="nav-following" data-i18n="nav.following">Seguidos</button>
       <button class="nl" id="nav-ideas" data-i18n="nav.ideas">💡 Ideas</button>
     </div>
     <div class="nav-right" id="nav-right">
@@ -154,8 +155,28 @@
         </div>
         <div id="community-search-results"></div>
       </div>
-      <div id="community-following-list"></div>
-      <div id="community-feed"></div>
+      <div id="community-popular-feed"></div>
+    </section>
+  </div>
+
+  <!-- FOLLOWING VIEW -->
+  <div id="view-following" style="display:none">
+    <section class="games-section" style="padding-top:100px">
+      <div class="section-header">
+        <div>
+          <h2 data-i18n="following.page_title">Seguidos</h2>
+          <p style="color:var(--muted);font-size:0.9rem;margin-top:4px" data-i18n="following.page_subtitle">Tu feed de actividad</p>
+        </div>
+      </div>
+      <div class="community-search-wrap">
+        <div class="search-bar" style="max-width:480px;margin:0 0 24px">
+          <span class="search-icon">⌕</span>
+          <input type="text" id="following-search-input" autocomplete="off" data-i18n-placeholder="following.search" placeholder="Buscar jugadores por nombre..." />
+        </div>
+        <div id="following-search-results"></div>
+      </div>
+      <div id="following-list"></div>
+      <div id="following-feed"></div>
     </section>
   </div>
 

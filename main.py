@@ -643,6 +643,57 @@ def global_activity():
     return [dict(r) for r in rows]
 
 
+# ── Community popular feed ─────────────────────────────
+@app.get("/api/community/popular")
+def community_popular():
+    from database import DATABASE_URL
+    db = get_db()
+    if DATABASE_URL:  # PostgreSQL: DISTINCT ON picks latest entry per user
+        rows = db.execute("""
+            SELECT * FROM (
+                SELECT DISTINCT ON (ge.user_id)
+                    ge.steam_appid, ge.game_name, ge.game_image,
+                    ge.status, ge.rating, ge.review, ge.notes,
+                    COALESCE(ge.rated_at, ge.added_at) as added_at,
+                    u.username as player,
+                    u.avatar_color, u.avatar_icon, u.avatar_b64,
+                    u.is_premium,
+                    (SELECT COUNT(*) FROM follows WHERE following_id = u.id) as followers_count
+                FROM game_entries ge
+                JOIN users u ON u.id = ge.user_id
+                WHERE ge.rating IS NOT NULL AND ge.status NOT IN ('library', 'wishlist')
+                ORDER BY ge.user_id, COALESCE(ge.rated_at, ge.added_at) DESC
+            ) sub
+            ORDER BY followers_count DESC, added_at DESC
+            LIMIT 20
+        """).fetchall()
+    else:  # SQLite: correlated subquery selects the correct row per user
+        rows = db.execute("""
+            SELECT ge.steam_appid, ge.game_name, ge.game_image,
+                   ge.status, ge.rating, ge.review, ge.notes,
+                   COALESCE(ge.rated_at, ge.added_at) as added_at,
+                   u.username as player,
+                   u.avatar_color, u.avatar_icon, u.avatar_b64,
+                   u.is_premium,
+                   (SELECT COUNT(*) FROM follows WHERE following_id = u.id) as followers_count
+            FROM game_entries ge
+            JOIN users u ON u.id = ge.user_id
+            WHERE ge.rating IS NOT NULL
+              AND ge.status NOT IN ('library', 'wishlist')
+              AND COALESCE(ge.rated_at, ge.added_at) = (
+                  SELECT MAX(COALESCE(ge2.rated_at, ge2.added_at))
+                  FROM game_entries ge2
+                  WHERE ge2.user_id = ge.user_id
+                    AND ge2.rating IS NOT NULL
+                    AND ge2.status NOT IN ('library', 'wishlist')
+              )
+            ORDER BY followers_count DESC, added_at DESC
+            LIMIT 20
+        """).fetchall()
+    db.close()
+    return [dict(r) for r in rows]
+
+
 # ── Admin cache clear ────────────────────────────────
 @app.get("/api/admin/clear-cache")
 def clear_cache():
@@ -1480,6 +1531,7 @@ async def genre_community_ranking(genre_key: str):
 @app.get("/explore/{genre_key}")
 @app.get("/reset-password")
 @app.get("/community")
+@app.get("/seguidos")
 async def spa_fallback():
     return FileResponse("static/index.html")
 

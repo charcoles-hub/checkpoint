@@ -44,7 +44,7 @@ let totalGames = 0;
 let genreCache = null;
 
 // ── Views ────────────────────────────────────────────
-const VIEWS = ['home', 'profile-me', 'ranking', 'profile', 'explore', 'community', 'ideas', 'contacto'];
+const VIEWS = ['home', 'profile-me', 'ranking', 'profile', 'explore', 'community', 'following', 'ideas', 'contacto'];
 
 function showView(name) {
   if (_tourEl) {
@@ -87,6 +87,7 @@ document.getElementById('nav-profile-me').addEventListener('click', () => { hist
 document.getElementById('nav-ranking').addEventListener('click', () => { history.pushState({}, '', '/ranking'); showView('ranking'); loadRanking(); closeMenu(); });
 document.getElementById('nav-explore').addEventListener('click', () => { history.pushState({}, '', '/explore'); showView('explore'); loadExplore(); closeMenu(); });
 document.getElementById('nav-community').addEventListener('click', () => { history.pushState({}, '', '/community'); showView('community'); loadCommunity(); closeMenu(); });
+document.getElementById('nav-following').addEventListener('click', () => { history.pushState({}, '', '/seguidos'); showView('following'); loadFollowing(); closeMenu(); });
 document.getElementById('nav-ideas').addEventListener('click', () => { history.pushState({}, '', '/ideas'); showView('ideas'); loadIdeas(); closeMenu(); });
 document.getElementById('footer-contact').addEventListener('click', () => { history.pushState({}, '', '/contacto'); showView('contacto'); });
 document.getElementById('footer-tour').addEventListener('click', () => {
@@ -163,6 +164,7 @@ function route() {
   }
   else if (path.startsWith('/u/')) { showView('profile'); loadProfile(path.slice(3)); }
   else if (path === '/community') { showView('community'); loadCommunity(); }
+  else if (path === '/seguidos') { showView('following'); loadFollowing(); }
   else if (path === '/ideas') { showView('ideas'); loadIdeas(); }
   else if (path === '/contacto') { showView('contacto'); }
   else { showView('home'); loadGames(); loadHomeFeed(); initGenrePills(); }
@@ -1413,66 +1415,22 @@ async function loadHomeFeed() {
   } catch { feedEl.innerHTML = ''; }
 }
 
-// ── Following section ─────────────────────────────────
+// ── Following view ────────────────────────────────────
 let followingLoaded = false;
 
-async function loadFollowingSection() {
-  if (followingLoaded) return;
-  followingLoaded = true;
-
+async function loadFollowing() {
+  const searchInput = document.getElementById('following-search-input');
+  const resultsEl = document.getElementById('following-search-results');
   const listEl = document.getElementById('following-list');
   const feedEl = document.getElementById('following-feed');
-  listEl.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
 
-  const { following, feed } = await AUTH.apiFetch('/api/following');
-
-  // Render followed users
-  if (!following.length) {
-    listEl.innerHTML = `<p style="color:var(--muted);margin-bottom:24px">${t('following.empty')}</p>`;
-  } else {
-    listEl.innerHTML = `<h4 style="margin-bottom:12px;color:var(--muted2);font-size:0.9rem;text-transform:uppercase;letter-spacing:.05em">${t('following.title')}</h4>`;
-    following.forEach(u => {
-      const row = document.createElement('div');
-      row.className = 'user-row';
-      row.innerHTML = `
-        <div class="user-avatar-sm">${u.username[0].toUpperCase()}</div>
-        <span class="user-row-name">${u.username}</span>
-        <button class="btn-follow following" data-username="${u.username}">${t('following.btn_following')}</button>
-      `;
-      row.querySelector('.user-avatar-sm').addEventListener('click', () => {
-        history.pushState({}, '', `/u/${u.username}`); showView('profile'); loadProfile(u.username);
-      });
-      row.querySelector('span').addEventListener('click', () => {
-        history.pushState({}, '', `/u/${u.username}`); showView('profile'); loadProfile(u.username);
-      });
-      row.querySelector('.btn-follow').addEventListener('click', async (e) => {
-        if (!AUTH.user) { AUTH.showModal('login'); return; }
-        try {
-          await AUTH.apiFetch(`/api/follow/${u.username}`, { method: 'DELETE' });
-          row.remove();
-          showToast(t('toast.unfollow', {u: u.username}));
-          followingLoaded = false;
-        } catch (err) { if (err.status === 401) AUTH.showModal('login'); }
-      });
-      listEl.appendChild(row);
-    });
-  }
-
-  // Render activity feed
-  if (!feed.length) {
-    feedEl.innerHTML = `<p style="color:var(--muted)">${t('following.feed_empty')}</p>`;
-  } else {
-    feedEl.innerHTML = `<h4 style="margin:24px 0 12px;color:var(--muted2);font-size:0.9rem;text-transform:uppercase;letter-spacing:.05em">${t('following.activity')}</h4>`;
-    feed.forEach(e => feedEl.appendChild(renderFeedItem(e)));
-  }
-
-  // User search
-  const searchInput = document.getElementById('user-search-input');
-  const resultsEl = document.getElementById('user-search-results');
+  // Search bar (clone to remove stale listeners)
   let searchTO = null;
-  searchInput.addEventListener('input', () => {
+  const freshInput = searchInput.cloneNode(true);
+  searchInput.parentNode.replaceChild(freshInput, searchInput);
+  freshInput.addEventListener('input', () => {
     clearTimeout(searchTO);
-    const q = searchInput.value.trim();
+    const q = freshInput.value.trim();
     if (!q) { resultsEl.innerHTML = ''; return; }
     searchTO = setTimeout(async () => {
       const users = await AUTH.apiFetch(`/api/users/search?q=${encodeURIComponent(q)}`);
@@ -1485,35 +1443,87 @@ async function loadFollowingSection() {
           <div class="user-avatar-sm" style="background:${avatarBg(u)}">${avatarContent(u, '1rem')}</div>
           <div style="flex:1">
             <span class="user-row-name">${u.username}</span>
+            ${u.is_premium ? '<span class="premium-badge" style="font-size:0.8rem">⭐</span>' : ''}
             <span style="color:var(--muted);font-size:0.8rem;margin-left:8px">${t('following.games', {n: u.total_games})}</span>
           </div>
-          <button class="btn-follow ${u.is_following ? 'following' : ''}" data-username="${u.username}">
+          ${AUTH.user ? `<button class="btn-follow ${u.is_following ? 'following' : ''}" data-username="${u.username}">
             ${u.is_following ? t('following.btn_following') : t('following.btn_follow')}
-          </button>
+          </button>` : ''}
         `;
         const btn = row.querySelector('.btn-follow');
-        btn.addEventListener('click', async () => {
-          if (!AUTH.user) { AUTH.showModal('login'); return; }
-          try {
-          if (btn.classList.contains('following')) {
-            await AUTH.apiFetch(`/api/follow/${u.username}`, { method: 'DELETE' });
-            btn.classList.remove('following'); btn.textContent = t('following.btn_follow');
-            showToast(t('toast.unfollow', {u: u.username}));
-          } else {
-            await AUTH.apiFetch(`/api/follow/${u.username}`, { method: 'POST' });
-            btn.classList.add('following'); btn.textContent = t('following.btn_following');
-            showToast(t('toast.follow', {u: u.username}));
-          }
-          } catch (err) { if (err.status === 401) AUTH.showModal('login'); }
-          followingLoaded = false;
-        });
+        if (btn) {
+          btn.addEventListener('click', async () => {
+            if (!AUTH.user) { AUTH.showModal('login'); return; }
+            try {
+              if (btn.classList.contains('following')) {
+                await AUTH.apiFetch(`/api/follow/${u.username}`, { method: 'DELETE' });
+                btn.classList.remove('following'); btn.textContent = t('following.btn_follow');
+                showToast(t('toast.unfollow', {u: u.username}));
+              } else {
+                await AUTH.apiFetch(`/api/follow/${u.username}`, { method: 'POST' });
+                btn.classList.add('following'); btn.textContent = t('following.btn_following');
+                showToast(t('toast.follow', {u: u.username}));
+              }
+              followingLoaded = false;
+            } catch (err) { if (err.status === 401) AUTH.showModal('login'); }
+          });
+        }
         row.querySelector('.user-avatar-sm').addEventListener('click', () => {
+          history.pushState({}, '', `/u/${u.username}`); showView('profile'); loadProfile(u.username);
+        });
+        row.querySelector('.user-row-name').addEventListener('click', () => {
           history.pushState({}, '', `/u/${u.username}`); showView('profile'); loadProfile(u.username);
         });
         resultsEl.appendChild(row);
       });
-    }, 350);
+    }, 300);
   });
+
+  if (!AUTH.user) {
+    listEl.innerHTML = `<p style="color:var(--muted);margin:24px 0">${t('following.login_prompt')}</p>`;
+    return;
+  }
+  if (followingLoaded) return;
+  followingLoaded = true;
+
+  listEl.innerHTML = '';
+  feedEl.innerHTML = '';
+  listEl.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  const { following, feed } = await AUTH.apiFetch('/api/following');
+
+  if (!following.length) {
+    listEl.innerHTML = `<p style="color:var(--muted);margin:16px 0">${t('following.empty')}</p>`;
+  } else {
+    listEl.innerHTML = `<h4 style="margin:24px 0 12px;color:var(--muted2);font-size:0.9rem;text-transform:uppercase;letter-spacing:.05em">${t('following.title')}</h4>`;
+    following.forEach(u => {
+      const row = document.createElement('div');
+      row.className = 'user-row';
+      row.innerHTML = `
+        <div class="user-avatar-sm" style="background:${avatarBg(u)}">${avatarContent(u, '1rem')}</div>
+        <span class="user-row-name">${u.username}</span>
+        <button class="btn-follow following" data-username="${u.username}">${t('following.btn_following')}</button>
+      `;
+      row.querySelector('.user-avatar-sm').addEventListener('click', () => {
+        history.pushState({}, '', `/u/${u.username}`); showView('profile'); loadProfile(u.username);
+      });
+      row.querySelector('.user-row-name').addEventListener('click', () => {
+        history.pushState({}, '', `/u/${u.username}`); showView('profile'); loadProfile(u.username);
+      });
+      row.querySelector('.btn-follow').addEventListener('click', async () => {
+        await AUTH.apiFetch(`/api/follow/${u.username}`, { method: 'DELETE' });
+        row.remove(); followingLoaded = false;
+        showToast(t('toast.unfollow', {u: u.username}));
+      });
+      listEl.appendChild(row);
+    });
+  }
+
+  if (!feed.length) {
+    feedEl.innerHTML = `<p style="color:var(--muted);margin-top:16px">${t('following.feed_empty')}</p>`;
+  } else {
+    feedEl.innerHTML = `<h4 style="margin:24px 0 12px;color:var(--muted2);font-size:0.9rem;text-transform:uppercase;letter-spacing:.05em">${t('following.activity')}</h4>`;
+    feed.forEach(e => feedEl.appendChild(renderFeedItem(e)));
+  }
 }
 
 function timeAgo(dateStr) {
@@ -1633,16 +1643,13 @@ async function loadProfile(username) {
 let communityLoaded = false;
 
 async function loadCommunity() {
-  communityLoaded = false;
   const searchInput = document.getElementById('community-search-input');
   const resultsEl = document.getElementById('community-search-results');
-  const listEl = document.getElementById('community-following-list');
-  const feedEl = document.getElementById('community-feed');
+  const feedEl = document.getElementById('community-popular-feed');
 
-  listEl.innerHTML = '';
   feedEl.innerHTML = '';
 
-  // User search
+  // Search bar (clone to remove stale listeners)
   let searchTO = null;
   const freshInput = searchInput.cloneNode(true);
   searchInput.parentNode.replaceChild(freshInput, searchInput);
@@ -1682,7 +1689,7 @@ async function loadCommunity() {
                 btn.classList.add('following'); btn.textContent = t('following.btn_following');
                 showToast(t('toast.follow', {u: u.username}));
               }
-              communityLoaded = false;
+              followingLoaded = false;
             } catch (err) { if (err.status === 401) AUTH.showModal('login'); }
           });
         }
@@ -1697,45 +1704,24 @@ async function loadCommunity() {
     }, 300);
   });
 
-  if (!AUTH.user) return;
   if (communityLoaded) return;
   communityLoaded = true;
 
-  listEl.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
-  const { following, feed } = await AUTH.apiFetch('/api/following');
-
-  if (!following.length) {
-    listEl.innerHTML = `<p style="color:var(--muted);margin:16px 0">${t('following.empty')}</p>`;
-  } else {
-    listEl.innerHTML = `<h4 style="margin:24px 0 12px;color:var(--muted2);font-size:0.9rem;text-transform:uppercase;letter-spacing:.05em">${t('following.title')}</h4>`;
-    following.forEach(u => {
-      const row = document.createElement('div');
-      row.className = 'user-row';
-      row.innerHTML = `
-        <div class="user-avatar-sm">${u.username[0].toUpperCase()}</div>
-        <span class="user-row-name">${u.username}</span>
-        <button class="btn-follow following" data-username="${u.username}">${t('following.btn_following')}</button>
-      `;
-      row.querySelector('.user-avatar-sm').addEventListener('click', () => {
-        history.pushState({}, '', `/u/${u.username}`); showView('profile'); loadProfile(u.username);
-      });
-      row.querySelector('.user-row-name').addEventListener('click', () => {
-        history.pushState({}, '', `/u/${u.username}`); showView('profile'); loadProfile(u.username);
-      });
-      row.querySelector('.btn-follow').addEventListener('click', async () => {
-        await AUTH.apiFetch(`/api/follow/${u.username}`, { method: 'DELETE' });
-        row.remove(); communityLoaded = false;
-        showToast(t('toast.unfollow', {u: u.username}));
-      });
-      listEl.appendChild(row);
-    });
-  }
-
-  if (!feed.length) {
-    feedEl.innerHTML = `<p style="color:var(--muted);margin-top:16px">${t('following.feed_empty')}</p>`;
-  } else {
-    feedEl.innerHTML = `<h4 style="margin:24px 0 12px;color:var(--muted2);font-size:0.9rem;text-transform:uppercase;letter-spacing:.05em">${t('following.activity')}</h4>`;
-    feed.forEach(e => feedEl.appendChild(renderFeedItem(e)));
+  feedEl.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const items = await AUTH.apiFetch('/api/community/popular');
+    feedEl.innerHTML = '';
+    if (!items.length) {
+      feedEl.innerHTML = `<p style="color:var(--muted);margin-top:16px">${t('community.popular_empty')}</p>`;
+      return;
+    }
+    const title = document.createElement('h4');
+    title.style.cssText = 'margin:0 0 16px;color:var(--muted2);font-size:0.9rem;text-transform:uppercase;letter-spacing:.05em';
+    title.textContent = t('community.popular_title');
+    feedEl.appendChild(title);
+    items.forEach(e => feedEl.appendChild(renderFeedItem(e)));
+  } catch {
+    feedEl.innerHTML = `<p style="color:var(--muted);margin-top:16px">${t('community.popular_empty')}</p>`;
   }
 }
 
@@ -2101,8 +2087,9 @@ const TOUR_STEPS = [
   { target: '#search-input', get title() { return t('tour.step2.title'); }, get text() { return t('tour.step2.text'); }, pos: 'bottom' },
   { target: '#nav-explore',  get title() { return t('tour.step3.title'); }, get text() { return t('tour.step3.text'); }, pos: 'bottom' },
   { target: '#nav-ranking',  get title() { return t('tour.step4.title'); }, get text() { return t('tour.step4.text'); }, pos: 'bottom' },
-  { target: '#nav-community',get title() { return t('tour.step5.title'); }, get text() { return t('tour.step5.text'); }, pos: 'bottom' },
-  { target: '#nav-ideas',    get title() { return t('tour.step6.title'); }, get text() { return t('tour.step6.text'); }, pos: 'bottom' },
+  { target: '#nav-community', get title() { return t('tour.step5.title'); }, get text() { return t('tour.step5.text'); }, pos: 'bottom' },
+  { target: '#nav-following', get title() { return t('tour.step5b.title'); }, get text() { return t('tour.step5b.text'); }, pos: 'bottom' },
+  { target: '#nav-ideas',     get title() { return t('tour.step6.title'); }, get text() { return t('tour.step6.text'); }, pos: 'bottom' },
   { target: '#btn-premium-menu', get title() { return t('tour.step7.title'); }, get text() { return t('tour.step7.text'); }, pos: 'bottom' },
   { target: '#btn-register', get title() { return t('tour.step8.title'); }, get text() { return t('tour.step8.text'); }, pos: 'bottom', cta: true },
 ];
@@ -2135,12 +2122,23 @@ const PAGE_TOURS = {
     { target: null,
       get title() { return t('tour.community.step0.title'); },
       get text()  { return t('tour.community.step0.text'); } },
-    { target: '#community-search-input', pos: 'bottom',
+    { target: '#community-popular-feed', pos: 'top',
       get title() { return t('tour.community.step1.title'); },
       get text()  { return t('tour.community.step1.text'); } },
-    { target: '#community-feed', pos: 'top',
+    { target: '#community-search-input', pos: 'bottom',
       get title() { return t('tour.community.step2.title'); },
       get text()  { return t('tour.community.step2.text'); } },
+  ],
+  following: [
+    { target: null,
+      get title() { return t('tour.following.step0.title'); },
+      get text()  { return t('tour.following.step0.text'); } },
+    { target: '#following-feed', pos: 'top',
+      get title() { return t('tour.following.step1.title'); },
+      get text()  { return t('tour.following.step1.text'); } },
+    { target: '#following-search-input', pos: 'bottom',
+      get title() { return t('tour.following.step2.title'); },
+      get text()  { return t('tour.following.step2.text'); } },
   ],
   ideas: [
     { target: null,

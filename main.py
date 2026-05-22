@@ -972,7 +972,8 @@ def get_game_reviews(appid: int):
         FROM game_entries ge JOIN users u ON ge.user_id = u.id
         WHERE ge.steam_appid=? AND ge.rating IS NOT NULL
           AND ge.status IN ('played', 'playing')
-        ORDER BY COALESCE(ge.rated_at, ge.added_at) DESC LIMIT 20
+          AND ge.review IS NOT NULL AND ge.review != ''
+        ORDER BY COALESCE(ge.rated_at, ge.added_at) DESC LIMIT 5
     """, (appid,)).fetchall()
     db.close()
     return [dict(r) for r in rows]

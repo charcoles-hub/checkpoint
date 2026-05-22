@@ -1625,7 +1625,7 @@ async function loadProfile(username) {
     function renderProfileList() {
       const filtered =
         activeStatus === 'all' ? entries :
-        activeStatus === 'rated' ? entries
+        activeStatus === 'rated' ? [...entries]
           .filter(e => e.rating)
           .sort((a, b) => new Date(b.rated_at || b.added_at) - new Date(a.rated_at || a.added_at)) :
         entries.filter(e => e.status === activeStatus);

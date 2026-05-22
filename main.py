@@ -250,6 +250,7 @@ async def game_detail(game_id: int):
     g = entry["data"]
     po = g.get("price_overview")
 
+    from database import DATABASE_URL
     db = get_db()
     if DATABASE_URL:
         stats_row = db.execute(

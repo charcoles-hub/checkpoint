@@ -1643,7 +1643,29 @@ async function loadProfile(username) {
         entries.filter(e => e.status === activeStatus);
       profileGrid.innerHTML = '';
       if (!filtered.length) { profileGrid.innerHTML = `<div class="no-results">${t('profile.no_games')}</div>`; return; }
-      filtered.forEach(e => profileGrid.appendChild(renderCard(e, () => openModal(e.steam_appid))));
+      if (activeStatus === 'rated') {
+        profileGrid.classList.add('ratings-list');
+        filtered.forEach(e => {
+          const item = document.createElement('div');
+          item.className = 'feed-item';
+          item.innerHTML = `
+            <img src="${e.game_image || ''}" class="feed-thumb" onerror="this.style.display='none'" />
+            <div class="feed-info">
+              <div class="feed-user">
+                <span class="feed-game" style="font-weight:600">${escHtml(e.game_name)}</span>
+                ${e.rating ? `<span class="game-rating" style="font-size:0.8rem;padding:2px 8px;margin-left:8px">${e.rating}/10</span>` : ''}
+                <span class="feed-time" style="margin-left:auto">${timeAgo(e.rated_at || e.added_at)}</span>
+              </div>
+              ${e.notes ? `<div class="feed-review">"${escHtml(e.notes.slice(0, 200))}${e.notes.length > 200 ? '…' : ''}"</div>` : ''}
+            </div>
+          `;
+          item.addEventListener('click', () => openModal(e.steam_appid));
+          profileGrid.appendChild(item);
+        });
+      } else {
+        profileGrid.classList.remove('ratings-list');
+        filtered.forEach(e => profileGrid.appendChild(renderCard(e, () => openModal(e.steam_appid))));
+      }
     }
     document.querySelectorAll('#profile-tabs .list-tab').forEach(tab => {
       const fresh = tab.cloneNode(true);

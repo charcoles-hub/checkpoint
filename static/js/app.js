@@ -1623,7 +1623,12 @@ async function loadProfile(username) {
 
     let activeStatus = 'all';
     function renderProfileList() {
-      const filtered = activeStatus === 'all' ? entries : entries.filter(e => e.status === activeStatus);
+      const filtered =
+        activeStatus === 'all' ? entries :
+        activeStatus === 'rated' ? entries
+          .filter(e => e.rating)
+          .sort((a, b) => new Date(b.rated_at || b.added_at) - new Date(a.rated_at || a.added_at)) :
+        entries.filter(e => e.status === activeStatus);
       profileGrid.innerHTML = '';
       if (!filtered.length) { profileGrid.innerHTML = `<div class="no-results">${t('profile.no_games')}</div>`; return; }
       filtered.forEach(e => profileGrid.appendChild(renderCard(e, () => openModal(e.steam_appid))));

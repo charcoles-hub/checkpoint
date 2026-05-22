@@ -184,24 +184,65 @@ async def _fetch_genres_and_tags(appid: int) -> list[str]:
         cache_set(cache_key, genres, ttl_hours=24 * 7)
     return genres
 
+async def _warm_genres_bg(appids: list):
+    for appid in appids:
+        try:
+            await _fetch_genres_and_tags(appid)
+            await asyncio.sleep(1)
+        except Exception:
+            pass
+
+
+async def _get_spy_list(spy_type: str, spy_slug: str) -> list:
+    """Fetch + filter + cache the full game list for a SteamSpy genre/tag."""
+    list_key = f"spy_list:{spy_type}:{spy_slug}"
+    cached = cache_get(list_key)
+    if cached is not None:
+        return cached
+    try:
+        data = await get(STEAMSPY, {"request": spy_type, spy_type: spy_slug})
+        candidates = [g for g in data.values() if g.get("appid")]
+        if spy_type == "tag":
+            top = candidates[:300]
+            # One batch DB query for all cached genres — no HTTP calls, no OOM
+            db = get_db()
+            keys = [f"game_genres_tags:{g['appid']}" for g in top]
+            placeholders = ",".join("?" * len(keys))
+            rows = db.execute(
+                f"SELECT key, data FROM api_cache WHERE key IN ({placeholders}) AND expires_at > CURRENT_TIMESTAMP",
+                keys
+            ).fetchall()
+            db.close()
+            genres_map = {r["key"].split(":", 1)[1]: json.loads(r["data"]) for r in rows}
+            filtered, uncached = [], []
+            for g in top:
+                aid = str(g["appid"])
+                if aid in genres_map:
+                    if spy_slug in genres_map[aid]:
+                        filtered.append(g)
+                else:
+                    filtered.append(g)  # unknown: include for now
+                    uncached.append(g["appid"])
+            candidates = filtered
+            if uncached:
+                asyncio.create_task(_warm_genres_bg(uncached[:30]))
+        all_games = [
+            {"id": g["appid"], "name": g["name"], "image": img(g["appid"]),
+             "playtime": round(g.get("average_forever", 0) / 60, 1), "price": None}
+            for g in candidates
+        ]
+        cache_set(list_key, all_games, ttl_hours=6)
+        return all_games
+    except Exception:
+        return []
+
+
 async def steamspy_games_page(spy_type: str, spy_slug: str, page: int, cache_key: str):
     """Página de juegos de SteamSpy por género/tag. Cacheado 24h en DB."""
     cached = cache_get(cache_key)
     if cached is not None:
         return cached
-    list_key = f"spy_list:{spy_type}:{spy_slug}"
-    all_games = cache_get(list_key)
-    if all_games is None:
-        try:
-            data = await get(STEAMSPY, {"request": spy_type, spy_type: spy_slug})
-            all_games = [
-                {"id": g["appid"], "name": g["name"], "image": img(g["appid"]),
-                 "playtime": round(g.get("average_forever", 0) / 60, 1), "price": None}
-                for g in data.values() if g.get("appid")
-            ]
-            cache_set(list_key, all_games, ttl_hours=24)
-        except Exception:
-            all_games = []
+    all_games = await _get_spy_list(spy_type, spy_slug)
     ps = 40
     s = (page - 1) * ps
     out = {"results": all_games[s:s + ps], "count": len(all_games)}
@@ -505,7 +546,7 @@ def update_settings(body: dict, user=Depends(require_auth)):
     return {"ok": True}
 
 
-def _pub(u): return {"id": u["id"], "username": u["username"], "email": u["email"], "notify_ntfy": u.get("notify_ntfy"), "is_premium": bool(u.get("is_premium", 0)), "steam_id": u.get("steam_id"), "bio": u.get("bio") or "", "username_changed_at": _dt_str(u.get("username_changed_at")), "avatar_color": u.get("avatar_color") or "", "avatar_icon": u.get("avatar_icon") or "", "avatar_b64": u.get("avatar_b64") or "", "last_steam_sync": _dt_str(u.get("last_steam_sync"))}
+def _pub(u): return {"id": u["id"], "username": u["username"], "email": u["email"], "notify_ntfy": u.get("notify_ntfy"), "is_premium": bool(u.get("is_premium", 0)), "is_admin": bool(ADMIN_USERNAME and u.get("username") == ADMIN_USERNAME), "steam_id": u.get("steam_id"), "bio": u.get("bio") or "", "username_changed_at": _dt_str(u.get("username_changed_at")), "avatar_color": u.get("avatar_color") or "", "avatar_icon": u.get("avatar_icon") or "", "avatar_b64": u.get("avatar_b64") or "", "last_steam_sync": _dt_str(u.get("last_steam_sync"))}
 
 
 def _parse_dt(val):
@@ -833,6 +874,29 @@ def update_suggestion(sid: int, body: dict, user=Depends(require_auth)):
         raise HTTPException(400, "Estado inválido")
     db = get_db()
     db.execute("UPDATE suggestions SET status=? WHERE id=?", (status, sid))
+    db.commit(); db.close()
+    return {"ok": True}
+
+
+@app.delete("/api/admin/suggestions/{sid}")
+def admin_delete_suggestion(sid: int, user=Depends(require_auth)):
+    if not ADMIN_USERNAME or user.get("username") != ADMIN_USERNAME:
+        raise HTTPException(403, "No autorizado")
+    db = get_db()
+    db.execute("DELETE FROM suggestions WHERE id=?", (sid,))
+    db.commit(); db.close()
+    return {"ok": True}
+
+
+@app.delete("/api/admin/reviews/{username}/{appid}")
+def admin_delete_review(username: str, appid: int, user=Depends(require_auth)):
+    if not ADMIN_USERNAME or user.get("username") != ADMIN_USERNAME:
+        raise HTTPException(403, "No autorizado")
+    db = get_db()
+    target = db.execute("SELECT id FROM users WHERE username=?", (username,)).fetchone()
+    if not target:
+        db.close(); raise HTTPException(404, "Usuario no encontrado")
+    db.execute("UPDATE game_entries SET review=NULL WHERE user_id=? AND steam_appid=?", (target["id"], appid))
     db.commit(); db.close()
     return {"ok": True}
 
@@ -1492,16 +1556,7 @@ async def genres_previews():
         if cached is not None:
             return cached
         try:
-            list_key = f"spy_list:{spy_type}:{spy_slug}"
-            all_games = cache_get(list_key)
-            if all_games is None:
-                data = await get(STEAMSPY, {"request": spy_type, spy_type: spy_slug})
-                all_games = [
-                    {"id": g["appid"], "name": g["name"], "image": img(g["appid"]),
-                     "playtime": round(g.get("average_forever", 0) / 60, 1), "price": None}
-                    for g in data.values() if g.get("appid")
-                ]
-                cache_set(list_key, all_games, ttl_hours=24)
+            all_games = await _get_spy_list(spy_type, spy_slug)
             out = {
                 "key": genre["key"],
                 "count": len(all_games),

@@ -1651,7 +1651,7 @@ async function loadProfile(username) {
           item.innerHTML = `
             <img src="${escHtml(e.game_image || '')}" class="feed-thumb" onerror="this.style.display='none'" />
             <div class="feed-info">
-              <div class="feed-user">
+              <div class="feed-user" style="display:flex;align-items:center;gap:4px">
                 <span class="feed-game" style="font-weight:600">${escHtml(e.game_name)}</span>
                 ${e.rating ? `<span class="game-rating" style="font-size:0.8rem;padding:2px 8px;margin-left:8px">${escHtml(String(e.rating))}/10</span>` : ''}
                 <span class="feed-time" style="margin-left:auto">${timeAgo(e.rated_at || e.added_at)}</span>

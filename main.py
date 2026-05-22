@@ -902,9 +902,11 @@ def save_review(request: Request, appid: int, body: dict, user=Depends(require_a
 def get_game_reviews(appid: int):
     db = get_db()
     rows = db.execute("""
-        SELECT ge.review, ge.rating, COALESCE(ge.rated_at, ge.added_at) as added_at, u.username
+        SELECT ge.review, ge.rating, COALESCE(ge.rated_at, ge.added_at) as added_at,
+               u.username, u.avatar_color, u.avatar_icon
         FROM game_entries ge JOIN users u ON ge.user_id = u.id
-        WHERE ge.steam_appid=? AND ge.review IS NOT NULL AND ge.review != ''
+        WHERE ge.steam_appid=? AND ge.rating IS NOT NULL
+          AND ge.status IN ('played', 'playing')
         ORDER BY COALESCE(ge.rated_at, ge.added_at) DESC LIMIT 20
     """, (appid,)).fetchall()
     db.close()

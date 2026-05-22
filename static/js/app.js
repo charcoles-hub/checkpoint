@@ -798,14 +798,14 @@ async function openModal(gameId) {
         const el = document.getElementById('modal-reviews');
         if (!el || !reviews.length) return;
         el.innerHTML = `
-          <h4 class="modal-section-title">${t('modal.community_reviews')}</h4>
+          <h4 class="modal-section-title">${t('modal.community_ratings')}</h4>
           ${reviews.map(r => `
             <div class="community-review-item">
               <div class="review-meta">
                 <span class="review-username">${escHtml(r.username)}</span>
                 ${r.rating ? `<span class="game-rating" style="font-size:0.8rem;padding:2px 8px">${r.rating}/10</span>` : ''}
               </div>
-              <p class="review-text">${escHtml(r.review)}</p>
+              ${r.review ? `<p class="review-text">${escHtml(r.review)}</p>` : ''}
             </div>
           `).join('')}
         `;

@@ -569,6 +569,7 @@ async function openModal(gameId) {
       <div class="detail-meta">
         ${g.release_date ? `<div class="detail-badge">📅 <strong>${g.release_date}</strong></div>` : ''}
         ${g.metacritic ? `<div class="detail-badge">🎯 Metacritic <strong>${g.metacritic}</strong></div>` : ''}
+        ${g.community_avg ? `<div class="detail-badge">⭐ <strong>${g.community_avg}</strong>/10 <span style="color:var(--muted);font-size:0.85rem">(${g.community_votes} ${g.community_votes === 1 ? t('modal.rating_singular') : t('modal.rating_plural')})</span></div>` : ''}
         ${g.price ? `<div class="detail-badge">💰 <strong>${g.price}</strong>${g.discount ? ` <span class="discount-tag">-${g.discount}%</span>` : ''}</div>` : ''}
         ${g.developers?.length ? `<div class="detail-badge">👾 <strong>${g.developers[0]}</strong></div>` : ''}
       </div>

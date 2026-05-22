@@ -249,6 +249,25 @@ async def game_detail(game_id: int):
         raise HTTPException(404, "Juego no encontrado")
     g = entry["data"]
     po = g.get("price_overview")
+
+    from database import DATABASE_URL
+    db = get_db()
+    if DATABASE_URL:
+        stats_row = db.execute(
+            "SELECT ROUND(AVG(rating::numeric),1)::float AS avg_rating, COUNT(*) AS votes "
+            "FROM game_entries WHERE steam_appid=? AND rating IS NOT NULL AND status IN ('played','playing')",
+            (game_id,)
+        ).fetchone()
+    else:
+        stats_row = db.execute(
+            "SELECT ROUND(AVG(rating),1) AS avg_rating, COUNT(*) AS votes "
+            "FROM game_entries WHERE steam_appid=? AND rating IS NOT NULL AND status IN ('played','playing')",
+            (game_id,)
+        ).fetchone()
+    db.close()
+    community_avg = stats_row["avg_rating"] if stats_row and stats_row["avg_rating"] else None
+    community_votes = int(stats_row["votes"]) if stats_row else 0
+
     return {
         "id": game_id,
         "name": g.get("name"),
@@ -262,6 +281,8 @@ async def game_detail(game_id: int):
         "price": fmt_price(po) or "Gratis",
         "price_eur": raw_price(po),
         "discount": po.get("discount_percent") if po else None,
+        "community_avg": community_avg,
+        "community_votes": community_votes,
     }
 
 
@@ -882,9 +903,11 @@ def save_review(request: Request, appid: int, body: dict, user=Depends(require_a
 def get_game_reviews(appid: int):
     db = get_db()
     rows = db.execute("""
-        SELECT ge.review, ge.rating, COALESCE(ge.rated_at, ge.added_at) as added_at, u.username
+        SELECT ge.review, ge.rating, COALESCE(ge.rated_at, ge.added_at) as added_at,
+               u.username, u.avatar_color, u.avatar_icon
         FROM game_entries ge JOIN users u ON ge.user_id = u.id
-        WHERE ge.steam_appid=? AND ge.review IS NOT NULL AND ge.review != ''
+        WHERE ge.steam_appid=? AND ge.rating IS NOT NULL
+          AND ge.status IN ('played', 'playing')
         ORDER BY COALESCE(ge.rated_at, ge.added_at) DESC LIMIT 20
     """, (appid,)).fetchall()
     db.close()

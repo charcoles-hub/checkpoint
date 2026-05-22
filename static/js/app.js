@@ -569,6 +569,7 @@ async function openModal(gameId) {
       <div class="detail-meta">
         ${g.release_date ? `<div class="detail-badge">📅 <strong>${g.release_date}</strong></div>` : ''}
         ${g.metacritic ? `<div class="detail-badge">🎯 Metacritic <strong>${g.metacritic}</strong></div>` : ''}
+        ${g.community_avg ? `<div class="detail-badge">⭐ <strong>${g.community_avg}</strong>/10 <span style="color:var(--muted);font-size:0.85rem">(${g.community_votes} ${g.community_votes === 1 ? t('modal.rating_singular') : t('modal.rating_plural')})</span></div>` : ''}
         ${g.price ? `<div class="detail-badge">💰 <strong>${g.price}</strong>${g.discount ? ` <span class="discount-tag">-${g.discount}%</span>` : ''}</div>` : ''}
         ${g.developers?.length ? `<div class="detail-badge">👾 <strong>${g.developers[0]}</strong></div>` : ''}
       </div>
@@ -797,14 +798,14 @@ async function openModal(gameId) {
         const el = document.getElementById('modal-reviews');
         if (!el || !reviews.length) return;
         el.innerHTML = `
-          <h4 class="modal-section-title">${t('modal.community_reviews')}</h4>
+          <h4 class="modal-section-title">${t('modal.community_ratings')}</h4>
           ${reviews.map(r => `
             <div class="community-review-item">
               <div class="review-meta">
                 <span class="review-username">${escHtml(r.username)}</span>
                 ${r.rating ? `<span class="game-rating" style="font-size:0.8rem;padding:2px 8px">${r.rating}/10</span>` : ''}
               </div>
-              <p class="review-text">${escHtml(r.review)}</p>
+              ${r.review ? `<p class="review-text">${escHtml(r.review)}</p>` : ''}
             </div>
           `).join('')}
         `;
@@ -1622,7 +1623,12 @@ async function loadProfile(username) {
 
     let activeStatus = 'all';
     function renderProfileList() {
-      const filtered = activeStatus === 'all' ? entries : entries.filter(e => e.status === activeStatus);
+      const filtered =
+        activeStatus === 'all' ? entries :
+        activeStatus === 'rated' ? [...entries]
+          .filter(e => e.rating)
+          .sort((a, b) => new Date(b.rated_at || b.added_at) - new Date(a.rated_at || a.added_at)) :
+        entries.filter(e => e.status === activeStatus);
       profileGrid.innerHTML = '';
       if (!filtered.length) { profileGrid.innerHTML = `<div class="no-results">${t('profile.no_games')}</div>`; return; }
       filtered.forEach(e => profileGrid.appendChild(renderCard(e, () => openModal(e.steam_appid))));

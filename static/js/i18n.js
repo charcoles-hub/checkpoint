@@ -309,7 +309,10 @@ const STRINGS = {
     'modal.review_label': 'Tu reseña pública',
     'modal.review_placeholder': 'Escribe tu reseña... (se mostrará a todos los usuarios)',
     'modal.btn_review': 'Guardar reseña',
-    'modal.community_reviews': 'Reseñas de la comunidad',
+    'modal.community_ratings': 'Valoraciones de la comunidad',
+    'modal.rating_singular': 'valoración',
+    'modal.rating_plural': 'valoraciones',
+    'tab.rated': 'Valoraciones',
     'toast.review_saved': '✍️ Reseña guardada',
 
     'time.now': 'ahora',
@@ -710,7 +713,10 @@ const STRINGS = {
     'modal.review_label': 'Your public review',
     'modal.review_placeholder': 'Write your review... (visible to all users)',
     'modal.btn_review': 'Save review',
-    'modal.community_reviews': 'Community reviews',
+    'modal.community_ratings': 'Community ratings',
+    'modal.rating_singular': 'rating',
+    'modal.rating_plural': 'ratings',
+    'tab.rated': 'Ratings',
     'toast.review_saved': '✍️ Review saved',
 
     'time.now': 'just now',

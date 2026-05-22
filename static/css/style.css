@@ -258,6 +258,12 @@ body::after {
   gap: 14px;
 }
 
+.games-grid.ratings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
 /* GAME CARD — poster format */
 .game-card {
   position: relative; aspect-ratio: 2/3;

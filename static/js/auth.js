@@ -46,7 +46,6 @@ window.AUTH = {
     document.getElementById('btn-login').style.display = loggedIn ? 'none' : '';
     document.getElementById('btn-register').style.display = loggedIn ? 'none' : '';
     document.getElementById('user-menu').style.display = loggedIn ? '' : 'none';
-    document.getElementById('nav-profile-me').style.display = loggedIn ? '' : 'none';
     if (loggedIn) {
       document.getElementById('btn-username').textContent = this.user.is_premium ? `⭐ ${this.user.username}` : this.user.username;
       const premiumBtn = document.getElementById('btn-premium-menu');

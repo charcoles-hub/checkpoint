@@ -61,8 +61,7 @@ function showView(name) {
     'ranking': 'nav-ranking',
     'community': 'nav-community',
     'following': 'nav-following',
-    'ideas': 'nav-ideas',
-    'profile-me': 'nav-profile-me'
+    'ideas': 'nav-ideas'
   };
   document.querySelectorAll('.nl').forEach(b => b.classList.remove('active'));
   const activeNav = navMap[name];
@@ -95,7 +94,7 @@ document.addEventListener('click', e => {
 
 // ── Nav ──────────────────────────────────────────────
 document.getElementById('nav-home').addEventListener('click', e => { e.preventDefault(); history.pushState({}, '', '/'); resetHome(); closeMenu(); });
-document.getElementById('nav-profile-me').addEventListener('click', () => { history.pushState({}, '', '/mi-perfil'); showView('profile-me'); profileMeTab = 'mygames'; loadProfileMe(); closeMenu(); });
+document.getElementById('btn-profile-menu').addEventListener('click', () => { history.pushState({}, '', '/mi-perfil'); showView('profile-me'); profileMeTab = 'mygames'; loadProfileMe(); closeMenu(); });
 document.getElementById('nav-ranking').addEventListener('click', () => { history.pushState({}, '', '/ranking'); showView('ranking'); loadRanking(); closeMenu(); });
 document.getElementById('nav-explore').addEventListener('click', () => { history.pushState({}, '', '/explore'); showView('explore'); loadExplore(); closeMenu(); });
 document.getElementById('nav-community').addEventListener('click', () => { history.pushState({}, '', '/community'); showView('community'); loadCommunity(); closeMenu(); });

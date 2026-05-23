@@ -56,6 +56,18 @@ function showView(name) {
     const el = document.getElementById(`view-${v}`);
     if (el) el.style.display = v === name ? '' : 'none';
   });
+  const navMap = {
+    'explore': 'nav-explore',
+    'ranking': 'nav-ranking',
+    'community': 'nav-community',
+    'following': 'nav-following',
+    'ideas': 'nav-ideas',
+    'profile-me': 'nav-profile-me'
+  };
+  document.querySelectorAll('.nl').forEach(b => b.classList.remove('active'));
+  const activeNav = navMap[name];
+  if (activeNav) document.getElementById(activeNav)?.classList.add('active');
+
   if (PAGE_TOURS[name] && !localStorage.getItem(`ck_tour_${name}_done`)) {
     setTimeout(() => {
       if (!_tourEl && document.getElementById(`view-${name}`)?.style.display !== 'none') startPageTour(name);

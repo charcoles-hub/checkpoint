@@ -275,7 +275,7 @@ const STRINGS = {
     'toast.abandoned': '✕ Añadido a abandonados',
     'profile_me.tab_stats': 'Estadísticas',
 
-    'nav.ideas': '💡 Ideas',
+    'nav.ideas': 'Ideas',
     'ideas.title': '💡 Ideas & Sugerencias',
     'ideas.subtitle': 'Vota por lo que te gustaría ver en Checkpoint',
     'ideas.btn_new': '+ Nueva idea',
@@ -679,7 +679,7 @@ const STRINGS = {
     'toast.abandoned': '✕ Added to abandoned',
     'profile_me.tab_stats': 'Stats',
 
-    'nav.ideas': '💡 Ideas',
+    'nav.ideas': 'Ideas',
     'ideas.title': '💡 Ideas & Suggestions',
     'ideas.subtitle': 'Vote for what you\'d like to see in Checkpoint',
     'ideas.btn_new': '+ New idea',

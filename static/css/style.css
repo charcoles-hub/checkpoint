@@ -200,6 +200,34 @@ body::after {
   border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px;
   font-family: monospace; flex-shrink: 0;
 }
+.feeling-divider { color: var(--border); flex-shrink: 0; user-select: none; }
+.feeling-btn {
+  background: none; border: none; color: #a78bfa;
+  font-size: .78rem; cursor: pointer; flex-shrink: 0; padding: 0;
+  font-family: 'DM Sans', sans-serif; white-space: nowrap;
+}
+.feeling-btn:hover { color: var(--text); }
+.search-bar.feeling-active {
+  border-color: rgba(139,92,246,.5);
+  background: rgba(79,35,120,.15);
+  box-shadow: 0 0 0 3px rgba(139,92,246,.1), 0 8px 32px rgba(0,0,0,.4);
+}
+#feeling-submit-row {
+  display: none; max-width: 540px; margin: 8px auto 0;
+  justify-content: flex-end; gap: 8px;
+}
+#feeling-submit-row.visible { display: flex; }
+.feeling-card-score {
+  position: absolute; top: 8px; right: 8px;
+  font-size: .68rem; font-weight: 700;
+  padding: 2px 7px; border-radius: 5px; z-index: 2;
+}
+.feeling-card-score.high { background: #14532d; color: #4ade80; }
+.feeling-card-score.medium { background: #713f12; color: #fbbf24; }
+.feeling-card-tags {
+  font-size: .6rem; color: #a78bfa; margin-top: 2px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 
 /* Genre pills (hidden in hero, only used by JS for filtering) */
 .genre-pills { display: none; }

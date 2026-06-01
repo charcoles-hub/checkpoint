@@ -8,6 +8,7 @@ import stripe
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 import base64
+import hashlib
 import io
 from fastapi import FastAPI, Depends, HTTPException, Request, UploadFile, File
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -25,6 +26,7 @@ load_dotenv()
 
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 RESEND_FROM = os.getenv("RESEND_FROM", "Checkpoint <noreply@mycheckpoint.games>")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
 def send_email(to: str, subject: str, body: str):
     if not RESEND_API_KEY:
@@ -277,6 +279,111 @@ async def list_games(search: str = "", page: int = 1):
          "price": fmt_spy_price(g)}
         for g in all_g[s:s + ps]
     ], "count": len(all_g)}
+
+
+@app.get("/api/games/feeling")
+async def feeling_search(q: str = ""):
+    q = q.strip()
+    if len(q) < 10:
+        raise HTTPException(400, "Descripción demasiado corta")
+
+    q_key = q.lower()
+    cache_key = f"feeling:{hashlib.sha256(q_key.encode()).hexdigest()[:16]}"
+    cached = cache_get(cache_key)
+    if cached is not None:
+        return cached
+
+    if not GEMINI_API_KEY:
+        raise HTTPException(503, "No se pudo procesar la descripción, inténtalo de nuevo")
+
+    try:
+        from google import genai as _genai
+        _client = _genai.Client(api_key=GEMINI_API_KEY)
+        prompt = (
+            "Extract 4-7 tags or genres from RAWG/Steam that best match this game description. "
+            "Use exact Steam/RAWG tag names with proper capitalization "
+            "(e.g. 'Story Rich', 'Open World', 'Action RPG', 'Dark Fantasy', 'Souls-like'). "
+            "Return ONLY a valid JSON array of strings, no explanation, no markdown fences. "
+            f"Description: {q}"
+        )
+        response = await asyncio.to_thread(
+            _client.models.generate_content,
+            model="gemini-2.0-flash-lite",
+            contents=prompt
+        )
+        raw = response.text.strip().strip("```json").strip("```").strip()
+        tags = json.loads(raw)
+        if not isinstance(tags, list) or not tags:
+            raise ValueError("bad tags")
+    except Exception:
+        raise HTTPException(503, "No se pudo procesar la descripción, inténtalo de nuevo")
+
+    # Community games with any of the extracted tags
+    db = get_db()
+    or_conds = " OR ".join(["genres LIKE ?" for _ in tags])
+    like_params = tuple(f'%"{t}"%' for t in tags)
+    rows = db.execute(
+        f"SELECT steam_appid, game_name, game_image, genres, "
+        f"ROUND(AVG(rating::numeric),1)::float as community_rating "
+        f"FROM game_entries "
+        f"WHERE ({or_conds}) AND status IN ('played','playing') AND rating IS NOT NULL "
+        f"GROUP BY steam_appid, game_name, game_image, genres",
+        like_params
+    ).fetchall()
+    db.close()
+
+    results = []
+    for row in rows:
+        try:
+            game_genres = json.loads(row["genres"] or "[]")
+        except Exception:
+            game_genres = []
+        matched = [t for t in tags if t.lower() in [g.lower() for g in game_genres]]
+        score = round(len(matched) / len(tags) * 100)
+        if score < 40:
+            continue
+        results.append({
+            "appid": row["steam_appid"],
+            "name": row["game_name"],
+            "cover_url": img(row["steam_appid"]),
+            "score": score,
+            "matched_tags": matched,
+            "community_rating": row["community_rating"],
+        })
+
+    results.sort(key=lambda x: x["score"], reverse=True)
+    seen = {r["appid"] for r in results}
+
+    # SteamSpy fallback when fewer than 8 community matches
+    if len(results) < 8 and tags:
+        primary_slug = tags[0].lower().replace(" ", "-")
+        try:
+            spy_games = await _get_spy_list("tag", primary_slug)
+            for g in spy_games:
+                if len(results) >= 20:
+                    break
+                appid = g.get("id")
+                if not appid or appid in seen:
+                    continue
+                game_name = g.get("name", "")
+                if any(nsfw in game_name.lower() for nsfw in _NSFW_TAGS):
+                    continue
+                results.append({
+                    "appid": appid,
+                    "name": game_name,
+                    "cover_url": g.get("image") or img(appid),
+                    "score": round(100 / len(tags)),
+                    "matched_tags": [tags[0]],
+                    "community_rating": None,
+                })
+                seen.add(appid)
+        except Exception:
+            pass
+
+    results = results[:20]
+    if results:
+        cache_set(cache_key, results, ttl_hours=24)
+    return results
 
 
 @app.get("/api/games/{game_id}")

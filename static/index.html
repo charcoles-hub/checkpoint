@@ -97,10 +97,16 @@
         <div class="eyebrow"><span class="edot"></span><span data-i18n="hero.eyebrow">Tu diario de videojuegos</span></div>
         <h1 data-i18n-html="hero.title">Marca tu <span class="gradient-text">checkpoint</span></h1>
         <p data-i18n="hero.subtitle">Registra lo que has jugado, puntúa, escribe tus opiniones y compártelas con otros jugadores.</p>
-        <div class="search-bar">
-          <span class="search-icon">⌕</span>
+        <div class="search-bar" id="main-search-bar">
+          <span class="search-icon" id="search-bar-icon">⌕</span>
           <input type="text" id="search-input" autocomplete="off" data-i18n-placeholder="hero.search" placeholder="Buscar un juego..." />
-          <span class="search-kbd">ENTER</span>
+          <span class="search-kbd" id="search-kbd">ENTER</span>
+          <span class="feeling-divider">|</span>
+          <button class="feeling-btn" id="feeling-btn" data-i18n="feeling.toggle">✦ Por feeling</button>
+        </div>
+        <div id="feeling-submit-row">
+          <button class="btn-ghost" id="feeling-cancel" data-i18n="feeling.cancel">✕ Normal</button>
+          <button class="btn-primary" id="feeling-submit" data-i18n="feeling.submit">Buscar coincidencias →</button>
         </div>
         <!-- Genre pills (hidden, used by JS for filtering) -->
         <div class="genre-pills" id="genre-pills">

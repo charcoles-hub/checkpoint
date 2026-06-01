@@ -41,6 +41,7 @@ let currentPlatform = '';
 let currentSort = 'popular';
 let searchTimeout = null;
 let totalGames = 0;
+let feelingMode = false;
 let genreCache = null;
 
 // ── Views ────────────────────────────────────────────
@@ -352,8 +353,101 @@ async function loadGames() {
   }
 }
 
+// ── Feeling search ────────────────────────────────────
+function enterFeelingMode() {
+  feelingMode = true;
+  const bar = document.getElementById('main-search-bar');
+  const icon = document.getElementById('search-bar-icon');
+  const kbd = document.getElementById('search-kbd');
+  const submitRow = document.getElementById('feeling-submit-row');
+  bar.classList.add('feeling-active');
+  icon.textContent = '✦';
+  kbd.style.display = 'none';
+  searchInput.value = '';
+  searchInput.placeholder = t('feeling.placeholder');
+  searchInput.focus();
+  submitRow.classList.add('visible');
+  document.getElementById('platform-filter').style.display = 'none';
+  document.getElementById('genre-pills').style.display = 'none';
+}
+
+function exitFeelingMode() {
+  feelingMode = false;
+  const bar = document.getElementById('main-search-bar');
+  const icon = document.getElementById('search-bar-icon');
+  const kbd = document.getElementById('search-kbd');
+  const submitRow = document.getElementById('feeling-submit-row');
+  bar.classList.remove('feeling-active');
+  icon.textContent = '⌕';
+  kbd.style.display = '';
+  searchInput.value = '';
+  searchInput.placeholder = t('hero.search');
+  submitRow.classList.remove('visible');
+  currentSearch = '';
+  currentPage = 1;
+  sectionTitle.textContent = t('section.community_top');
+  loadGames();
+}
+
+async function submitFeelingSearch() {
+  const q = searchInput.value.trim();
+  if (q.length < 10) {
+    grid.innerHTML = `<div class="no-results">${t('feeling.too_short')}</div>`;
+    return;
+  }
+  grid.innerHTML = `<div class="loading"><div class="spinner"></div><p>${t('feeling.loading')}</p></div>`;
+  paginationEl.innerHTML = '';
+  sectionTitle.textContent = t('feeling.loading');
+  try {
+    const results = await AUTH.apiFetch(`/api/games/feeling?q=${encodeURIComponent(q)}`);
+    if (!Array.isArray(results) || !results.length) {
+      sectionTitle.textContent = '';
+      grid.innerHTML = `<div class="no-results">${t('feeling.no_results')}</div>`;
+      return;
+    }
+    const label = q.length > 40 ? q.slice(0, 40) + '…' : q;
+    sectionTitle.textContent = t('feeling.results', { n: results.length, q: label });
+    grid.innerHTML = '';
+    results.forEach(g => grid.appendChild(renderFeelingCard(g)));
+  } catch (err) {
+    sectionTitle.textContent = '';
+    grid.innerHTML = `<div class="no-results">${t('feeling.error')}</div>`;
+  }
+}
+
+function renderFeelingCard(g) {
+  const card = renderCard(
+    { id: g.appid, name: g.name, image: g.cover_url,
+      avg_rating: g.community_rating ?? undefined },
+    () => openModal(g.appid)
+  );
+  card.style.position = 'relative';
+  const badge = document.createElement('span');
+  badge.className = `feeling-card-score ${g.score >= 70 ? 'high' : 'medium'}`;
+  badge.textContent = `${g.score}%`;
+  card.appendChild(badge);
+  if (g.matched_tags?.length) {
+    const meta = card.querySelector('.game-card-meta');
+    if (meta) {
+      const tagsEl = document.createElement('div');
+      tagsEl.className = 'feeling-card-tags';
+      tagsEl.textContent = g.matched_tags.slice(0, 3).join(' · ');
+      meta.after(tagsEl);
+    }
+  }
+  return card;
+}
+
+document.getElementById('feeling-btn').addEventListener('click', enterFeelingMode);
+document.getElementById('feeling-cancel').addEventListener('click', exitFeelingMode);
+document.getElementById('feeling-submit').addEventListener('click', submitFeelingSearch);
+searchInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && feelingMode) { e.preventDefault(); submitFeelingSearch(); }
+});
+
 // ── Search ────────────────────────────────────────────
 searchInput.addEventListener('input', e => {
+  if (feelingMode) return;
   clearTimeout(searchTimeout);
   const q = e.target.value.trim();
   const platformFilter = document.getElementById('platform-filter');

@@ -11,3 +11,4 @@ slowapi
 resend
 Pillow
 python-multipart
+google-genai
